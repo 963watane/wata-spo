@@ -1,4 +1,6 @@
-# WATA☆SPO
+# WATA☆SPO (wata-spo)
+
+wata's first gacha game.
 
 An unofficial, non-commercial VSPO! fan game: a gacha with real-time 3D action battles
 (a squad of three, dodges, skills, support calls, Ultimates, Break) and an illustrated
