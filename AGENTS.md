@@ -3,7 +3,8 @@
 This is a hobby fan game by a first-time game maker, edited by more than one AI assistant
 (ChatGPT and Claude take turns). Keep each change focused, don't reformat or restructure
 files you aren't changing, and describe what you changed in plain words in the commit
-message so the next assistant can pick up where you left off.
+message so the next assistant can pick up where you left off. Read `HANDOFF.md` before you
+start and add an entry to it when you stop. `CHATGPT_BRIEF.md` is the current brief for visual work.
 
 ## How it is built
 
