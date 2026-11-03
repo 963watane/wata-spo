@@ -1,0 +1,3 @@
+# One line-ending style (LF) everywhere, so edits from different tools and assistants
+# don't flip whole files between Windows and Unix endings.
+* text=auto eol=lf

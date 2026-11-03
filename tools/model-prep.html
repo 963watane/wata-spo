@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Prep</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 20px; background: #15131f; color: #e8e6f2; font: 14px/1.5 system-ui, sans-serif; }
+  h1 { margin: 0 0 6px; font-size: 20px; }
+  p { margin: 0 0 14px; color: #a9a5c2; max-width: 760px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 12px; }
+  input, select, button { font: inherit; background: #262338; color: inherit; border: 1px solid #3d3957; border-radius: 6px; padding: 5px 8px; }
+  input[type=number] { width: 90px; }
+  button { cursor: pointer; background: #ffc93a; color: #1a1626; border: 0; font-weight: 700; padding: 7px 14px; }
+  button:disabled { opacity: .5; cursor: default; }
+  pre { background: #0e0c16; border-radius: 8px; padding: 10px 12px; min-height: 60px; white-space: pre-wrap; max-width: 900px; }
+  a { color: #8fd0ff; }
+  .views { display: flex; flex-wrap: wrap; gap: 12px; }
+  .views div { position: relative; }
+  .views canvas { display: block; background: #8a90a0; border-radius: 8px; width: 380px; height: 380px; max-width: calc(100vw - 40px); }
+  .views b { position: absolute; left: 10px; top: 8px; color: #fff; text-shadow: 0 1px 2px #000; }
+</style>
+</head>
+<body>
+<h1>Model prep</h1>
+<p>Turns a heavy .glb (for example one made with an image-to-3D tool) into a light one the game can load:
+fewer triangles, the colour texture saved as a separate JPEG, and a simple skeleton the game animates.
+Open this page through the game's server (<code>py serve.py</code>, then <code>http://localhost:8765/tools/model-prep.html</code>)
+to save straight into <code>assets/models</code>; otherwise use the download links.</p>
+<div class="row"><input type="file" id="file" accept=".glb,model/gltf-binary"> <span id="src"></span></div>
+<div class="row">
+  <label>Joints, as fractions of her height <input id="rig" size="120"></label>
+</div>
+<div class="row">
+  <label>Triangles <input id="tris" type="number" value="50000" min="5000" step="5000"></label>
+  <label>Texture <select id="tex"><option>1024</option><option selected>2048</option></select></label>
+  <label>Save as <input id="name" placeholder="name" size="16"></label>
+  <button id="go" disabled>Process</button>
+  <button id="save" disabled>Save to assets/models</button>
+</div>
+<pre id="log">Pick a .glb file.</pre>
+<div class="row" id="links"></div>
+<div class="views">
+  <div><canvas id="front" width="880" height="880"></canvas><b>Front (+Z faces you)</b></div>
+  <div><canvas id="side" width="880" height="880"></canvas><b>Side (from her left)</b></div>
+  <div><canvas id="bones" width="880" height="880"></canvas><b>Bones (colour = which bone moves it)</b></div>
+  <div><canvas id="posed" width="880" height="880"></canvas><b>Test pose</b></div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/+esm';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js/+esm';
+import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/GLTFExporter.js/+esm';
+import { MeshoptSimplifier } from 'https://cdn.jsdelivr.net/npm/meshoptimizer@0.21.0/meshopt_simplifier.module.js';
+
+const $ = id => document.getElementById(id);
+// Joint positions as fractions of her height (x: her left is +, z: forward is +), measured on
+// claude-child.glb. hairHue is the hue range (degrees) of her hair in the texture: hair only
+// follows the head and body, never the arms. Edit these for another model.
+const DEFAULT_RIG = { hips: 0.5, torso: 0.58, neck: 0.79, shoulder: [0.088, 0.735, -0.005], hand: [0.24, 0.44, 0], leg: 0.062, hem: 0.175, hairMin: 0.42, hairHue: [5, 40] };
+const BONES = ['hips', 'torso', 'head', 'armL', 'armR', 'legL', 'legR'];
+$('rig').value = JSON.stringify(DEFAULT_RIG);
+const logEl = $('log');
+const log = s => { logEl.textContent += '\n' + s; };
+let input = null, result = null;
+
+// Read a whole attribute as plain floats (handles interleaved and quantized data).
+function floats(a, n) {
+  const k = a.itemSize, out = new Float32Array(n * k), get = ['getX', 'getY', 'getZ', 'getW'];
+  for (let v = 0; v < n; v++) for (let c = 0; c < k; c++) out[v * k + c] = a[get[c]](v);
+  return out;
+}
+
+const sm = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+
+// Gives a static mesh a simple skeleton and skin weights. The game drives these bones with
+// the same animation channels as its built-in chibis (see Chibi.apply in js/chibi.js).
+function autoRig(geo, img, h, R) {
+  const P = geo.attributes.position.array, n = P.length / 3, ix = geo.index.array;
+  const UV = geo.attributes.uv ? geo.attributes.uv.array : null;
+  // 1. Which vertices are hair-coloured.
+  const hairy = new Float32Array(n);
+  if (UV && img) {
+    const S = 512, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const g = cv.getContext('2d'); g.drawImage(img, 0, 0, S, S);
+    const px = g.getImageData(0, 0, S, S).data;
+    for (let v = 0; v < n; v++) {
+      const u = Math.min(S - 1, Math.max(0, Math.floor(UV[v * 2] * S))), w = Math.min(S - 1, Math.max(0, Math.floor(UV[v * 2 + 1] * S))), o = (w * S + u) * 4;
+      const r = px[o] / 255, gg = px[o + 1] / 255, b = px[o + 2] / 255, mx = Math.max(r, gg, b), d = mx - Math.min(r, gg, b);
+      let hue = 0;
+      if (d) hue = 60 * (mx === r ? ((gg - b) / d + 6) % 6 : mx === gg ? (b - r) / d + 2 : (r - gg) / d + 4);
+      hairy[v] = hue >= R.hairHue[0] && hue <= R.hairHue[1] && d / (mx || 1) > 0.45 && mx > 0.35 ? 1 : 0;
+    }
+  }
+  // 2. Smooth that over the surface (welding texture seams) so small trims don't count as hair.
+  const wid = new Int32Array(n), key = new Map();
+  let W = 0;
+  for (let v = 0; v < n; v++) {
+    const k = Math.round(P[v * 3] * 2e4) + ',' + Math.round(P[v * 3 + 1] * 2e4) + ',' + Math.round(P[v * 3 + 2] * 2e4);
+    let id = key.get(k);
+    if (id === undefined) { id = W++; key.set(k, id); }
+    wid[v] = id;
+  }
+  const nb = Array.from({ length: W }, () => []);
+  for (let t = 0; t < ix.length; t += 3) { const a = wid[ix[t]], b = wid[ix[t + 1]], c = wid[ix[t + 2]]; nb[a].push(b, c); nb[b].push(a, c); nb[c].push(a, b); }
+  let hv = new Float32Array(W);
+  const cnt = new Float32Array(W);
+  for (let v = 0; v < n; v++) { hv[wid[v]] += hairy[v]; cnt[wid[v]]++; }
+  for (let w = 0; w < W; w++) hv[w] /= cnt[w];
+  for (let it = 0; it < 6; it++) {
+    const nx = new Float32Array(W);
+    for (let w = 0; w < W; w++) { let s = hv[w], c = 1; for (const o of nb[w]) { s += hv[o]; c++; } nx[w] = s / c; }
+    hv = nx;
+  }
+  // 3. Weights: legs below the skirt, the skirt on the hips with its hem swaying a little with each
+  // leg, then hips -> body -> head up the middle, and the arms (never hair) along their bones.
+  const sh = R.shoulder, hd = R.hand, segD = (x, y, z, a, b) => {
+    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ap = [x - a[0], y - a[1], z - a[2]];
+    const t = Math.max(0, Math.min(1, (ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / (ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2)));
+    return [Math.hypot(ap[0] - ab[0] * t, ap[1] - ab[1] * t, ap[2] - ab[2] * t), t];
+  };
+  // Arms first, per welded point: within reach of the arm bone (puffy sleeves near the shoulder,
+  // slim at the hand), and only what can be reached by walking along the surface from the middle
+  // of the arm, so a skirt beside the hand stays put. Hair joins an arm only where it lies right
+  // on the sleeve (that also keeps orange cuff trims on the arm).
+  const wx = new Float32Array(W * 3);
+  for (let v = 0; v < n; v++) for (let q = 0; q < 3; q++) wx[wid[v] * 3 + q] = P[v * 3 + q] / h;
+  const hairW = new Uint8Array(W), arm = [new Float32Array(W), new Float32Array(W)];
+  for (let w = 0; w < W; w++) {
+    const x = wx[w * 3], y = wx[w * 3 + 1], z = wx[w * 3 + 2];
+    hairW[w] = hv[w] > 0.5 && y > R.hairMin ? 1 : 0;
+    if (y < R.hem) continue;
+    [1, -1].forEach((s, i) => {
+      if (x * s < 0.03) return;
+      const [d, t] = segD(x, y, z, [s * sh[0], sh[1], sh[2]], [s * hd[0], hd[1], hd[2]]), r = 0.05 - 0.02 * sm(0.55, 0.9, t);
+      if (hairW[w] && d > r * 0.9) return;
+      arm[i][w] = sm(r + 0.022, r, d) * sm(0, 0.18, t) * sm(0.07, 0.1, Math.abs(x));
+    });
+  }
+  arm.forEach(a => {
+    const reached = new Uint8Array(W), queue = [];
+    for (let w = 0; w < W; w++) if (a[w] > 0.5) { const t = segD(wx[w * 3], wx[w * 3 + 1], wx[w * 3 + 2], [Math.sign(wx[w * 3]) * sh[0], sh[1], sh[2]], [Math.sign(wx[w * 3]) * hd[0], hd[1], hd[2]])[1]; if (t > 0.25 && t < 0.8) { reached[w] = 1; queue.push(w); } }
+    while (queue.length) { const w = queue.pop(); for (const o of nb[w]) if (!reached[o] && a[o] > 0) { reached[o] = 1; queue.push(o); } }
+    for (let w = 0; w < W; w++) a[w] = reached[w] ? Math.min(1, a[w]) : 0;
+  });
+  const skinIndex = new Uint16Array(n * 4), skinWeight = new Float32Array(n * 4), counts = new Array(7).fill(0), isHair = new Uint8Array(n);
+  const raw = new Float32Array(n * 7);
+  for (let v = 0; v < n; v++) {
+    const x = P[v * 3] / h, y = P[v * 3 + 1] / h, z = P[v * 3 + 2] / h, hair = hairW[wid[v]] === 1;
+    isHair[v] = hair ? 1 : 0;
+    const w = [0, 0, 0, 0, 0, 0, 0];
+    // below the skirt, only what is close to a leg is leg (low skirt frills stay with the skirt)
+    if (y < R.hem && Math.min(Math.hypot(x - R.leg, z), Math.hypot(x + R.leg, z)) < 0.07) w[x >= 0 ? 5 : 6] = 1;
+    else {
+      if (y < R.hips) {
+        const k = 0.55 * Math.pow(Math.min(1, 1 - (y - R.hem) / (R.hips - R.hem)), 1.5), s = sm(-0.05, 0.05, x);
+        w[5] = k * s; w[6] = k * (1 - s); w[0] = 1 - k;
+      } else {
+        const tT = sm(R.hips + 0.02, R.torso + 0.04, y), tH = hair ? sm(0.55, R.neck + 0.01, y) : sm(R.neck - 0.02, R.neck + 0.02, y);
+        w[0] = 1 - tT; w[1] = tT * (1 - tH); w[2] = tT * tH;
+      }
+      [3, 4].forEach((bi, i) => {
+        const wa = arm[i][wid[v]];
+        if (wa <= 0) return;
+        for (let k = 0; k < 7; k++) w[k] *= 1 - wa;
+        w[bi] += wa;
+      });
+    }
+    for (let k = 0; k < 7; k++) raw[v * 7 + k] = w[k];
+  }
+  // Soften the hand-offs between bones (armpits, waist) by blending each cloth point with its
+  // neighbours a few times. Hair is left alone so it never picks up arm movement this way.
+  let ww = new Float32Array(W * 7);
+  for (let v = 0; v < n; v++) for (let k = 0; k < 7; k++) ww[wid[v] * 7 + k] += raw[v * 7 + k] / cnt[wid[v]];
+  for (let it = 0; it < 3; it++) {
+    const nx = ww.slice();
+    for (let w = 0; w < W; w++) {
+      if (hairW[w]) continue;
+      let c = 0;
+      const acc = [0, 0, 0, 0, 0, 0, 0];
+      for (const o of nb[w]) { if (hairW[o]) continue; c++; for (let k = 0; k < 7; k++) acc[k] += ww[o * 7 + k]; }
+      if (c) for (let k = 0; k < 7; k++) nx[w * 7 + k] = 0.5 * ww[w * 7 + k] + 0.5 * acc[k] / c;
+    }
+    ww = nx;
+  }
+  for (let v = 0; v < n; v++) {
+    const w = Array.from(ww.subarray(wid[v] * 7, wid[v] * 7 + 7));
+    const order = [0, 1, 2, 3, 4, 5, 6].sort((a, b) => w[b] - w[a]).slice(0, 4), sum = order.reduce((s, k) => s + w[k], 0) || 1;
+    order.forEach((k, j) => { skinIndex[v * 4 + j] = k; skinWeight[v * 4 + j] = w[k] / sum; });
+    counts[order[0]]++;
+  }
+  // Weights stored as bytes (0-255), the strongest one absorbing the rounding.
+  const q = new Uint8Array(n * 4);
+  for (let v = 0; v < n; v++) {
+    let s = 0;
+    for (let j = 0; j < 4; j++) { q[v * 4 + j] = Math.round(skinWeight[v * 4 + j] * 255); s += q[v * 4 + j]; }
+    q[v * 4] += 255 - s;
+  }
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndex, 4));
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(q, 4, true));
+  // 4. The bones, in the same layout as the chibis: hips carry legs and body; body carries head and arms.
+  const bone = (name, p, parent) => { const b = new THREE.Bone(); b.name = name; b.position.set(p[0] * h, p[1] * h, p[2] * h); if (parent) parent.add(b); return b; };
+  const hips = bone('hips', [0, R.hips, 0]);
+  const torso = bone('torso', [0, R.torso - R.hips, 0], hips);
+  const head = bone('head', [0, R.neck - R.torso, 0], torso);
+  const armL = bone('armL', [sh[0], sh[1] - R.torso, sh[2]], torso);
+  const armR = bone('armR', [-sh[0], sh[1] - R.torso, sh[2]], torso);
+  const legL = bone('legL', [R.leg, 0, 0], hips);
+  const legR = bone('legR', [-R.leg, 0, 0], hips);
+  const info = {
+    armRest: +Math.atan2(hd[0] - sh[0], sh[1] - hd[1]).toFixed(4),       // how far the arms already hang out (A-pose)
+    hand: [(-hd[0] + sh[0]) * h, (hd[1] - sh[1]) * h, (hd[2] - sh[2]) * h].map(x => +x.toFixed(4)),   // right hand, from the shoulder
+    hips: +(R.hips * h).toFixed(4), height: +h.toFixed(4),
+  };
+  log(`Rigged: main bone per vertex ${BONES.map((b, i) => b + ' ' + counts[i]).join(', ')}; ${isHair.reduce((a, b) => a + b, 0)} hair vertices.`);
+  return { bones: [hips, torso, head, armL, armR, legL, legR], info, isHair };
+}
+
+async function load(buf, name) {
+  input = { buf, name };
+  $('name').value = $('name').value || name.replace(/\.glb$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  logEl.textContent = `Loaded ${name} (${(buf.byteLength / 1048576).toFixed(1)} MB).`;
+  $('go').disabled = false;
+}
+
+async function prep() {
+  $('go').disabled = true; $('save').disabled = true;
+  const gltf = await new GLTFLoader().parseAsync(input.buf.slice(0), '');
+  gltf.scene.updateMatrixWorld(true);
+  const meshes = [];
+  gltf.scene.traverse(o => { if (o.isMesh) meshes.push(o); });
+  if (!meshes.length) { log('No mesh found.'); return; }
+  meshes.sort((a, b) => b.geometry.attributes.position.count - a.geometry.attributes.position.count);
+  if (meshes.length > 1) log(`${meshes.length} meshes: keeping the largest one only.`);
+  const mesh = meshes[0], g0 = mesh.geometry, n = g0.attributes.position.count;
+  const tris0 = g0.index ? g0.index.count / 3 : n / 3;
+  log(`Mesh "${mesh.name}": ${n} vertices, ${tris0} triangles, attributes ${Object.keys(g0.attributes).join(', ')}` +
+    (Object.keys(g0.morphAttributes).length ? `, ${g0.morphAttributes.position.length} shape keys (dropped)` : '') +
+    (mesh.isSkinnedMesh ? ', skinned (skin dropped)' : ''));
+
+  // Bake the node transform into plain float arrays.
+  const pos = floats(g0.attributes.position, n), nor = g0.attributes.normal ? floats(g0.attributes.normal, n) : null;
+  const uv = g0.attributes.uv ? floats(g0.attributes.uv, n) : null;
+  const m4 = mesh.matrixWorld, nm = new THREE.Matrix3().getNormalMatrix(m4), v = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    v.fromArray(pos, i * 3).applyMatrix4(m4).toArray(pos, i * 3);
+    if (nor) v.fromArray(nor, i * 3).applyMatrix3(nm).normalize().toArray(nor, i * 3);
+  }
+  const idx = g0.index ? Uint32Array.from(g0.index.array) : Uint32Array.from({ length: n }, (_, i) => i);
+
+  // Simplify. meshoptimizer keeps texture seams closed by itself.
+  await MeshoptSimplifier.ready;
+  const target = Math.min(idx.length, Math.floor(+$('tris').value) * 3);
+  const [simp, err] = MeshoptSimplifier.simplify(idx, pos, 3, target, 0.05, []);
+  const remap = new Int32Array(n).fill(-1);
+  let m = 0;
+  for (let i = 0; i < simp.length; i++) if (remap[simp[i]] < 0) remap[simp[i]] = m++;
+  const pack = (src, k) => { const out = new Float32Array(m * k); for (let i = 0; i < n; i++) if (remap[i] >= 0) for (let c = 0; c < k; c++) out[remap[i] * k + c] = src[i * k + c]; return out; };
+  const P = pack(pos, 3);
+
+  // Stand her on the origin: feet at y = 0, centred on her boots (not on the hair).
+  let minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < m; i++) { minY = Math.min(minY, P[i * 3 + 1]); maxY = Math.max(maxY, P[i * 3 + 1]); }
+  const h = maxY - minY;
+  let cx = 0, cz = 0, cn = 0;
+  for (let i = 0; i < m; i++) if (P[i * 3 + 1] < minY + h * 0.06) { cx += P[i * 3]; cz += P[i * 3 + 2]; cn++; }
+  cx /= cn || 1; cz /= cn || 1;
+  for (let i = 0; i < m; i++) { P[i * 3] -= cx; P[i * 3 + 1] -= minY; P[i * 3 + 2] -= cz; }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  if (nor) geo.setAttribute('normal', new THREE.BufferAttribute(pack(nor, 3), 3));
+  if (uv) geo.setAttribute('uv', new THREE.BufferAttribute(pack(uv, 2), 2));
+  const I = m < 65536 ? new Uint16Array(simp.length) : new Uint32Array(simp.length);
+  for (let i = 0; i < simp.length; i++) I[i] = remap[simp[i]];
+  geo.setIndex(new THREE.BufferAttribute(I, 1));
+  if (!nor) geo.computeVertexNormals();
+  log(`Simplified to ${m} vertices, ${simp.length / 3} triangles (error ${(err * 100).toFixed(2)}% of her size). Height ${h.toFixed(3)} m.`);
+
+  // Colour texture, resized, as a JPEG next to the model.
+  const S = +$('tex').value, img = mesh.material && mesh.material.map && mesh.material.map.image;
+  let jpg = null, tex = null;
+  if (img) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = S;
+    cv.getContext('2d').drawImage(img, 0, 0, S, S);
+    jpg = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.9));
+    tex = new THREE.CanvasTexture(cv); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace;
+    log(`Texture ${img.width}x${img.height} -> ${S}x${S} JPEG, ${(jpg.size / 1048576).toFixed(2)} MB.`);
+  } else log('No colour texture found.');
+
+  const rig = autoRig(geo, img, h, JSON.parse($('rig').value));
+  const out = new THREE.SkinnedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }));
+  out.name = $('name').value;
+  out.userData.rig = rig.info;   // read back by the game (glTF "extras")
+  const root = new THREE.Group();
+  root.add(out, rig.bones[0]);
+  root.updateMatrixWorld(true);
+  out.bind(new THREE.Skeleton(rig.bones));
+  // The game uses the JSON form of glTF (.gltf.json): web hosts serve JSON, but often not .glb.
+  // The .glb download is the same model for Blender and other tools.
+  const exp = new GLTFExporter();
+  const glb = new Blob([await exp.parseAsync(root, { binary: true })], { type: 'model/gltf-binary' });
+  const gltfJson = new Blob([JSON.stringify(await exp.parseAsync(root, { binary: false }))], { type: 'application/json' });
+  log(`Model ${(gltfJson.size / 1048576).toFixed(2)} MB as .gltf.json (${(glb.size / 1048576).toFixed(2)} MB as .glb).`);
+  result = { glb, gltfJson, jpg, name: $('name').value };
+  const links = $('links'); links.innerHTML = '';
+  [[gltfJson, '.gltf.json'], [jpg, '.jpg'], [glb, '.glb']].forEach(([b, ext]) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = result.name + ext; a.textContent = 'Download ' + result.name + ext; links.appendChild(a); });
+  draw(geo, tex, h);
+  drawRig(geo, tex, h, rig);
+  $('go').disabled = false; $('save').disabled = false;
+  window.prepResult = { vertices: m, triangles: simp.length / 3, height: h, glbMB: glb.size / 1048576, jpgMB: jpg ? jpg.size / 1048576 : 0 };
+  window.prepGeo = geo; window.prepImg = img;   // for poking at in the console
+}
+
+// Orthographic front and side views with a grid every 5% of her height, for placing joints.
+function draw(geo, tex, h) {
+  [['front', [0, 0, 5]], ['side', [5, 0, 0]]].forEach(([id, p]) => {
+    const cv = $(id), r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+    r.outputColorSpace = THREE.SRGBColorSpace;
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight('#ffffff', '#888899', 2.2));
+    scene.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, color: tex ? 0xffffff : 0xdddddd })));
+    const half = h * 0.56, cam = new THREE.OrthographicCamera(-half, half, half, -half, 0.1, 20);
+    cam.position.set(p[0], h / 2, p[2]); cam.lookAt(0, h / 2, 0);
+    const grid = new THREE.Group();
+    for (let k = 0; k <= 20; k++) {
+      const y = h * k / 20, wide = k % 2 === 0;
+      const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-half, y, 0), new THREE.Vector3(half, y, 0)]), new THREE.LineBasicMaterial({ color: wide ? 0xffe066 : 0x445566, transparent: true, opacity: wide ? 0.7 : 0.45, depthTest: false }));
+      grid.add(ln);
+    }
+    for (let k = -10; k <= 10; k++) {
+      const x = h * k / 20;
+      grid.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, -h * 0.06, 0), new THREE.Vector3(x, h * 1.06, 0)]), new THREE.LineBasicMaterial({ color: k === 0 ? 0xff5577 : 0x445566, transparent: true, opacity: 0.45, depthTest: false })));
+    }
+    if (id === 'side') grid.rotation.y = Math.PI / 2;
+    scene.add(grid);
+    r.render(scene, cam);
+  });
+}
+
+// Left: each vertex coloured by the bones that move it. Right: a test pose (right arm swinging,
+// head and body turned, legs mid-stride) to spot tearing.
+function drawRig(geo, tex, h, rig) {
+  const cols = [[0.6, 0.6, 0.6], [0.25, 0.5, 1], [1, 0.85, 0.2], [0.2, 0.85, 0.3], [1, 0.25, 0.3], [0.7, 0.35, 1], [1, 0.55, 0.15]];
+  const g2 = geo.clone(), si = geo.attributes.skinIndex.array, sw = geo.attributes.skinWeight.array, n = si.length / 4, c = new Float32Array(n * 3);
+  for (let v = 0; v < n; v++) for (let j = 0; j < 4; j++) { const k = si[v * 4 + j], w = sw[v * 4 + j] / 255; for (let q = 0; q < 3; q++) c[v * 3 + q] += cols[k][q] * w; }
+  for (let v = 0; v < n; v++) if (rig.isHair[v]) for (let q = 0; q < 3; q++) c[v * 3 + q] = c[v * 3 + q] * 0.55 + 0.45;
+  g2.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  const view = (id, obj, cam) => {
+    const r = new THREE.WebGLRenderer({ canvas: $(id), antialias: true, preserveDrawingBuffer: true });
+    r.outputColorSpace = THREE.SRGBColorSpace;
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight('#ffffff', '#888899', 2.2), obj);
+    r.render(scene, cam);
+  };
+  const half = h * 0.56, front = new THREE.OrthographicCamera(-half, half, half, -half, 0.1, 20);
+  front.position.set(0, h / 2, 5); front.lookAt(0, h / 2, 0);
+  view('bones', new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ vertexColors: true })), front);
+  // a fresh copy of the skeleton, posed
+  const bones = rig.bones.map(b => { const x = new THREE.Bone(); x.name = b.name; x.position.copy(b.position); return x; });
+  rig.bones.forEach((b, i) => { const p = rig.bones.indexOf(b.parent); if (p >= 0) bones[p].add(bones[i]); });
+  const sk = new THREE.SkinnedMesh(geo, new THREE.MeshLambertMaterial({ map: tex })), grp = new THREE.Group();
+  grp.add(sk, bones[0]); grp.updateMatrixWorld(true); sk.bind(new THREE.Skeleton(bones));
+  const B = Object.fromEntries(bones.map(b => [b.name, b])), rest = rig.info.armRest;
+  B.armR.rotation.set(-1.3, 0, -0.25 + rest);
+  B.armL.rotation.set(0.35, 0, 0.2 - rest);
+  B.torso.rotation.set(0.15, -0.3, 0);
+  B.head.rotation.set(0.1, 0.35, 0);
+  B.legL.rotation.x = -0.3; B.legR.rotation.x = 0.3;
+  grp.updateMatrixWorld(true);
+  window.prepPosed = sk;
+  const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 20);
+  cam.position.set(h * 1.4, h * 0.95, h * 1.9); cam.lookAt(0, h * 0.52, 0);
+  view('posed', grp, cam);
+}
+
+$('file').onchange = async e => { const f = e.target.files[0]; if (f) load(await f.arrayBuffer(), f.name); };
+$('go').onclick = () => prep().catch(e => { log('Failed: ' + e.message); $('go').disabled = false; });
+$('save').onclick = async () => {
+  for (const [b, ext] of [[result.gltfJson, '.gltf.json'], [result.jpg, '.jpg']]) {
+    if (!b) continue;
+    try {
+      const r = await fetch('../assets/models/' + result.name + ext, { method: 'PUT', body: b });
+      if (!r.ok) { log(`Saving needs the game's own server (py serve.py), status ${r.status}. Use the download links instead.`); return; }
+      log(`Saved assets/models/${result.name}${ext}`);
+    } catch (e) { log('Could not save: ' + e.message + '. Use the download links instead.'); return; }
+  }
+};
+const src = new URLSearchParams(location.search).get('src');
+if (src) { $('src').textContent = src; fetch(src).then(r => r.arrayBuffer()).then(b => load(b, src.split('/').pop())); }
+</script>
+</body>
+</html>

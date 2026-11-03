@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#090b16"/>
+  <path d="M0 330 512 230v80L0 410z" fill="#ff5c9a" opacity=".85"/>
+  <path d="M0 300 512 200v26L0 326z" fill="#ffd23f"/>
+  <text x="256" y="250" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="132" fill="#fff">WATA</text>
+  <text x="256" y="390" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="132" fill="#fff">SPO</text>
+  <path d="m256 262 14 29 32 4.6-23 22.5 5.5 31.9L256 335l-28.6 15 5.5-31.9-23-22.5 32-4.6z" fill="#ffd23f" stroke="#090b16" stroke-width="6"/>
+</svg>

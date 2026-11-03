@@ -1,0 +1,17 @@
+# The untouched download the 3D model was made from (30 MB). The game uses
+# assets/models/claude-child.gltf.json instead.
+tools/src/
+
+# Settings for the Claude desktop app's preview
+.claude/
+
+# Music and sound recordings you add stay on this computer (they are often someone
+# else's songs). Delete these lines if you own the tracks and want them in the repo.
+assets/music/*.mp3
+assets/music/*.ogg
+assets/sfx/*.mp3
+assets/sfx/*.ogg
+
+# System files
+Thumbs.db
+.DS_Store

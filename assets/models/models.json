@@ -1,0 +1,8 @@
+{
+  "sendo":  { "file": "claude-child.gltf.json", "map": "claude-child.jpg" },
+  "hinano": { "file": "claude-child.gltf.json", "map": "claude-child.jpg", "tint": { "hair": "#5a3329", "hair2": "#ff8fbe", "dark": "#4b3129" } },
+  "noah":   { "file": "claude-child.gltf.json", "map": "claude-child.jpg", "tint": { "hair": "#f2d475", "dark": "#262b4d" } },
+  "tsuna":  { "file": "claude-child.gltf.json", "map": "claude-child.jpg", "tint": { "hair": "#dd2f3d", "dark": "#1e1d24" } },
+  "uruha":  { "file": "claude-child.gltf.json", "map": "claude-child.jpg", "tint": { "hair": "#2b3352", "dark": "#2f4fe8" } },
+  "lisa":   { "file": "claude-child.gltf.json", "map": "claude-child.jpg", "tint": { "hair": "#e3d9a6", "dark": "#e58aa8" } }
+}
