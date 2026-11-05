@@ -80,4 +80,29 @@ test('stat previews do not spend tokens or change owned levels', () => {
   assert.ok(stats.atk>run("charStats('sendo').atk"));
   assert.deepEqual(json('SAVE'),before);
 });
+
+
+// Navigation is independent of rendering, so test the actual height/path projection rules.
+vm.runInContext(fs.readFileSync(path.join(root,'js','expedition.js'),'utf8'), context, { filename: 'expedition.js' });
+test('between-floor route has a continuous height along its stair flight', () => {
+  const q = json('SpoExpedition.project(-9,-33,{})');
+  assert.equal(q.x,-9); assert.equal(q.z,-33); assert.ok(Math.abs(q.y-.8)<.0001); assert.equal(q.distance,0);
+});
+test('route projection returns a finite nearest edge for a point off the deck', () => {
+  const q = json('SpoExpedition.project(-35,-29,{})');
+  assert.ok(Number.isFinite(q.x)&&Number.isFinite(q.z)&&Number.isFinite(q.y));
+  assert.ok(q.distance>20); assert.ok(q.index>=0&&q.index<8);
+});
+
+test('manual movement remains screen-relative as the camera rotates', () => {
+  const q = json('ActionBattle.prototype.moveInput.call({keys:{w:true},stick:{on:false},cam:{yaw:Math.PI/2}})');
+  assert.ok(Math.abs(q.x + 1)<.00001); assert.ok(Math.abs(q.z)<.00001);
+  const diagonal = json('ActionBattle.prototype.moveInput.call({keys:{w:true,d:true},stick:{on:false},cam:{yaw:-.28}})');
+  assert.ok(Math.abs(Math.hypot(diagonal.x,diagonal.z)-1)<.00001);
+});
+test('floor preparation advances only the excluded travel clock', () => {
+  const q = json('(()=>{const b={phase:"floor-loading",time:50,events:[],routeTime:5};ActionBattle.prototype.step.call(b,3);return b;})()');
+  assert.equal(q.time,53); assert.equal(q.routeTime,8);
+  assert.equal(run('ActionBattle.prototype.fightTime.call({time:53,t0:0,routeTime:8,over:false})'),45);
+});
 console.log(`${checks} total checks passed.`);

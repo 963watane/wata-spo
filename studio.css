@@ -1,18 +1,18 @@
 /* WATA SPO / The studio. Paper, sage and ink; one visual hierarchy throughout. */
 :root { --studio-paper: #f6f4ee; --studio-ink: #253f45; --studio-muted: #6d7d80; --studio-line: #ccd6d1; --studio-accent: #476e6c; }
-.screen:not(#battle):not(#loading) { --font: 'Exo 2', 'M PLUS Rounded 1c', sans-serif; --display: 'Exo 2', sans-serif; --text: #253f45; --muted: #65797c; --line: #cbd6d1; --edge: #cbd6d1; --panel: #fbfaf5; --surface-ui: #fbfaf5ed; --gold: #926b33; color: var(--text); background: var(--studio-paper); }
-.screen:not(#battle):not(#loading) .topbar { height: 70px; background: #faf9f4ed; border-bottom: 1px solid #d7ded8; box-shadow: none; }
-.screen:not(#battle):not(#loading) .topbar .title { font: 500 23px var(--display); text-shadow: none; letter-spacing: 0; }
-.screen:not(#battle):not(#loading) .topbar .title::after { color: #738985; font-size: 10px; }
-.screen:not(#battle):not(#loading) :is(.back,.btn,.pill,.ctl) { clip-path: none; border-radius: 7px; box-shadow: none; font-family: var(--font); text-transform: none; }
-.screen:not(#battle):not(#loading) :is(.back,.btn,.pill.dark) { background: #edf0e9; border: 1px solid #cdd7d0; color: #304c50; }
-.screen:not(#battle):not(#loading) :is(.btn.primary,.pill.yellow,.pill.light) { background: #365b5c; color: #fff; border: 1px solid #365b5c; }
-.screen:not(#battle):not(#loading) :is(.pill.blue,.pill.pink) { background: #d8e5df; color: #2d514f; border: 1px solid #b6cbc1; }
-.screen:not(#battle):not(#loading) .cur { gap: 10px; }
-.screen:not(#battle):not(#loading) .cur span { color: #36555a; background: #ffffffaa; padding: 7px 12px; border: 1px solid #d6dfd7; border-radius: 7px; font-size: 13px; }
-.screen:not(#battle):not(#loading) .cur span::before,.screen:not(#battle):not(#loading) .cur span::after { display: none; }
-.screen:not(#battle):not(#loading) button { transition: background-color 180ms ease-out, border-color 180ms ease-out, transform 180ms ease-out; }
-.screen:not(#battle):not(#loading) button:focus-visible { outline: 3px solid #698f89; outline-offset: 3px; }
+.screen:not(:where(#battle,#loading)) { --font: 'Exo 2', 'M PLUS Rounded 1c', sans-serif; --display: 'Exo 2', sans-serif; --text: #253f45; --muted: #65797c; --line: #cbd6d1; --edge: #cbd6d1; --panel: #fbfaf5; --surface-ui: #fbfaf5ed; --gold: #926b33; color: var(--text); background: var(--studio-paper); }
+.screen:not(:where(#battle,#loading)) .topbar { height: 70px; background: #faf9f4ed; border-bottom: 1px solid #d7ded8; box-shadow: none; }
+.screen:not(:where(#battle,#loading)) .topbar .title { font: 500 23px var(--display); text-shadow: none; letter-spacing: 0; }
+.screen:not(:where(#battle,#loading)) .topbar .title::after { color: #738985; font-size: 10px; }
+.screen:not(:where(#battle,#loading)) :is(.back,.btn,.pill,.ctl) { clip-path: none; border-radius: 7px; box-shadow: none; font-family: var(--font); text-transform: none; }
+.screen:not(:where(#battle,#loading)) :is(.back,.btn,.pill.dark) { background: #edf0e9; border: 1px solid #cdd7d0; color: #304c50; }
+.screen:not(:where(#battle,#loading)) :is(.btn.primary,.pill.yellow,.pill.light) { background: #365b5c; color: #fff; border: 1px solid #365b5c; }
+.screen:not(:where(#battle,#loading)) :is(.pill.blue,.pill.pink) { background: #d8e5df; color: #2d514f; border: 1px solid #b6cbc1; }
+.screen:not(:where(#battle,#loading)) .cur { gap: 10px; }
+.screen:not(:where(#battle,#loading)) .cur span { color: #36555a; background: #ffffffaa; padding: 7px 12px; border: 1px solid #d6dfd7; border-radius: 7px; font-size: 13px; }
+.screen:not(:where(#battle,#loading)) .cur span::before,.screen:not(:where(#battle,#loading)) .cur span::after { display: none; }
+.screen:not(:where(#battle,#loading)) button { transition: background-color 180ms ease-out, border-color 180ms ease-out, transform 180ms ease-out; }
+.screen:not(:where(#battle,#loading)) button:focus-visible { outline: 3px solid #698f89; outline-offset: 3px; }
 .studio-wipe { position: absolute; inset: 0; pointer-events: none; z-index: 999; background: #f6f4ee; animation: studioFade 240ms ease-out both; }
 .studio-wipe > * { display: none; }
 .studio-wipe.calm { animation-duration: 80ms; }
@@ -486,18 +486,18 @@
   .tm:has(.tm-stage) .tm-cards { left: 225px; right: 20px; top: 85px; bottom: 89px; }
   .tm:has(.tm-stage) .tm-actions .pill { padding: 9px 12px; font-size: 11px; }
 }
-.screen:not(#battle):not(#loading) .cur { background: transparent; box-shadow: none; clip-path: none; padding: 0; }
-.screen:not(#battle):not(#loading) :is(.set-card,.shop-item,.tw-side,.tw-floor,.mission,.rec-ach,.rd-side,.ev-stage,.rr-intro,.rr-run,.rr-log,.rr-choice,.pfl-card,.nw-body,.nw-item) { background: #fafbf4ec; border: 1px solid #d1dcc9; color: #4d6c47; box-shadow: none; border-radius: 9px !important; }
-.screen:not(#battle):not(#loading) :is(.set-credits,.rr-intro p,.rr-meta,.rr-status,.rr-log small) { color: #7a8e6e; }
-.screen:not(#battle):not(#loading) :is(.lv-tabs button,.seg button,.rr-node) { background: #e7eddf; color: #69865b; border: 1px solid #cedbc2; border-radius: 6px; box-shadow: none; }
-.screen:not(#battle):not(#loading) :is(.lv-tabs button.sel,.seg button.sel,.rr-node.now) { background: #b7cda6; color: #3a5e35; border-color: #9ab983; }
-.screen:not(#battle):not(#loading) :is(.ev-hero,.rd-boss) { color: #f5faec; border-radius: 10px; overflow: hidden; }
-.screen:not(#battle):not(#loading) .shop-ico { background: #e7ecd9; color: #8b9d5c; border: 1px solid #c5d4ab; border-radius: 12px; }
-.screen:not(#battle):not(#loading) :is(.rec-cat,.rr-intro em,.rr-intro h2) { color: #75945e; text-shadow: none; }
-.screen:not(#battle):not(#loading) .rr-node.done { opacity: .55; }
-.screen:not(#battle):not(#loading) .tw-floor.boss { background: #f0e4dd; color: #916c5e; }
-.screen:not(#battle):not(#loading) .tw-floor.boss span { color: #9b8270; }
-.screen:not(#battle):not(#loading) .mission .btn.go { color: #799658; border-color: #c4d3b0; }
+.screen:not(:where(#battle,#loading)) .cur { background: transparent; box-shadow: none; clip-path: none; padding: 0; }
+.screen:not(:where(#battle,#loading)) :is(.set-card,.shop-item,.tw-side,.tw-floor,.mission,.rec-ach,.rd-side,.ev-stage,.rr-intro,.rr-run,.rr-log,.rr-choice,.pfl-card,.nw-body,.nw-item) { background: #fafbf4ec; border: 1px solid #d1dcc9; color: #4d6c47; box-shadow: none; border-radius: 9px !important; }
+.screen:not(:where(#battle,#loading)) :is(.set-credits,.rr-intro p,.rr-meta,.rr-status,.rr-log small) { color: #7a8e6e; }
+.screen:not(:where(#battle,#loading)) :is(.lv-tabs button,.seg button,.rr-node) { background: #e7eddf; color: #69865b; border: 1px solid #cedbc2; border-radius: 6px; box-shadow: none; }
+.screen:not(:where(#battle,#loading)) :is(.lv-tabs button.sel,.seg button.sel,.rr-node.now) { background: #b7cda6; color: #3a5e35; border-color: #9ab983; }
+.screen:not(:where(#battle,#loading)) :is(.ev-hero,.rd-boss) { color: #f5faec; border-radius: 10px; overflow: hidden; }
+.screen:not(:where(#battle,#loading)) .shop-ico { background: #e7ecd9; color: #8b9d5c; border: 1px solid #c5d4ab; border-radius: 12px; }
+.screen:not(:where(#battle,#loading)) :is(.rec-cat,.rr-intro em,.rr-intro h2) { color: #75945e; text-shadow: none; }
+.screen:not(:where(#battle,#loading)) .rr-node.done { opacity: .55; }
+.screen:not(:where(#battle,#loading)) .tw-floor.boss { background: #f0e4dd; color: #916c5e; }
+.screen:not(:where(#battle,#loading)) .tw-floor.boss span { color: #9b8270; }
+.screen:not(:where(#battle,#loading)) .mission .btn.go { color: #799658; border-color: #c4d3b0; }
 .ab .abl-num { font: 600 19px 'Exo 2',sans-serif; text-shadow: -1px -1px #324239, 1px 1px #324239, 0 2px 4px #18352b66; letter-spacing: -.4px; }
 .ab .abl-num.big { font-size: 23px; }
 .ab .abl-num.weak { font-size: 21px; }
@@ -699,7 +699,7 @@
 #pull .rcard.r5 .rcard-back span { color: #b5a063; }
 #pull .results-btns .pill { clip-path: none; text-transform: none; }
 #pull .pt-shine { opacity: .28; }
-.screen:not(#battle):not(#loading) .topbar::after { display: none; }
+.screen:not(:where(#battle,#loading)) .topbar::after { display: none; }
 .tc-emblem,.tc.collab .tc-emblem { transform: none; width: 35px; height: 35px; border-radius: 50%; background: #f5f8ed; border: 1px solid #c4d4b6; color: #779361; box-shadow: none; font-size: 17px; }
 .tc-emblem span { transform: none; }
 .tc-slot { color: #6b8558; background: #f4f7eccc; padding: 3px 5px; border-radius: 4px; font: 500 13px 'Exo 2',sans-serif; text-shadow: none; }
@@ -716,8 +716,8 @@
 .ab .ab-banner.warn b { font-size: 21px; color: #edb8ad; border-color: #d49a91; text-shadow: none; animation: none; }
 .ab .ab-banner.perfect b { font-size: 25px; color: #d5ece8; text-shadow: none; }
 @media (max-height: 520px) { .ab .ab-banner b { font-size: 21px; } .ab .ab-banner.finish b { font-size: 28px; } }
-.screen:not(#battle):not(#loading) .shade-chip { background: #dbe5dd !important; border: 1px solid #b4c7bc; box-shadow: none; border-radius: 5px; }
-.screen:not(#battle):not(#loading) .shade-chip svg { filter: none; }
+.screen:not(:where(#battle,#loading)) .shade-chip { background: #dbe5dd !important; border: 1px solid #b4c7bc; box-shadow: none; border-radius: 5px; }
+.screen:not(:where(#battle,#loading)) .shade-chip svg { filter: none; }
 .smap .snode.locked { opacity: .78; background: #eef1e8; }
 .smap .snode.locked .snode-name { color: #74846e; }
 .smap .snode.locked .snode-name em { color: #96a08e; }

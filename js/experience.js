@@ -19,7 +19,7 @@ const SpoDesign = {
     const selected = SAVE.teams[index].plan || 'balanced';
     ov.className = 'overlay show';
     ov.innerHTML = `<section class="studio-training studio-plans" role="dialog" aria-modal="true" aria-labelledby="plans-title">
-      <header><div><small>SQUAD TACTICS</small><h2 id="plans-title">Choose your approach.</h2></div><button class="training-close" aria-label="Close tactics">${ic('close')}</button></header>
+      <header><div><small>SQUAD</small><h2 id="plans-title">Combat tactics</h2></div><button class="training-close" aria-label="Close tactics">${ic('close')}</button></header>
       <p>${restricted ? 'Ranked, tutorial and Bracket Run battles use their own rules. Balanced applies here.' : 'Each plan changes the leader or support rhythm. Unlock more through the story; switch freely between battles.'}</p>
       <div class="studio-plan-list">${Object.entries(this.plans).map(([key, p]) => `<button data-plan="${key}" ${!this.available(key) || restricted ? 'disabled' : ''} aria-pressed="${(restricted ? 'balanced' : selected) === key}">${ic(p.icon)}<span><b>${p.name}</b><small>${p.desc}</small>${this.available(key) ? '' : `<em>Unlock: clear ${p.unlock}</em>`}</span><i>${(restricted ? 'balanced' : selected) === key ? 'Selected' : this.available(key) ? 'Choose' : 'Locked'}</i></button>`).join('')}</div>
     </section>`;
@@ -66,7 +66,7 @@ const SpoDesign = {
     const render = value => {
       const q = this.trainingQuote(members, value), short = Math.max(0, q.cost - SAVE.exp);
       ov.innerHTML = `<section class="studio-training" role="dialog" aria-modal="true" aria-labelledby="training-title">
-        <header><div><small>SQUAD GROWTH</small><h2 id="training-title">A little stronger, together.</h2></div><button class="training-close" aria-label="Close training">${ic('close')}</button></header>
+        <header><div><small>SQUAD</small><h2 id="training-title">Squad training</h2></div><button class="training-close" aria-label="Close training">${ic('close')}</button></header>
         <p>Choose a target level. Review every upgrade before spending Superchat Tokens.</p>
         <label class="training-target">Target level <select aria-label="Target level">${Array.from({ length: MAX_LEVEL }, (_, i) => `<option ${i + 1 === q.target ? 'selected' : ''}>${i + 1}</option>`).join('')}</select><span>Balance ${SAVE.exp.toLocaleString()}</span></label>
         <div class="training-members">${q.rows.map(r => { const before = charStats(r.id), after = charStats(r.id, r.to); return `<div><i class="face" style="${faceStyle(r.id)}"></i><span><b>${CHARACTERS[r.id].short}</b><small>Lv ${r.from} ${r.from === r.to ? '· Already there' : `→ ${r.to}`}</small>${r.cost ? `<small class="training-gain">HP ${before.hp.toLocaleString()} → ${after.hp.toLocaleString()} · ATK ${before.atk} → ${after.atk}</small>` : ''}</span><strong>${r.cost.toLocaleString()}</strong></div>`; }).join('') || '<p>Add a member to your squad first.</p>'}</div>

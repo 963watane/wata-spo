@@ -22,7 +22,7 @@ const ARENA_THEMES = {
   'sunset-street': { sky: ['#3a2a6e', '#ff8a5c', '#ffd49c'], ground: '#d8a993', tile: '#c6927c', accent: '#ff7a3a', fog: '#ffae86', mote: '#ffd9a0', light: 0.95, outdoor: true },
   'alley':         { sky: ['#0c0922', '#3a1d5e', '#ff4fa3'], ground: '#565080', tile: '#655c90', accent: '#ff4fd8', fog: '#2a1a4c', mote: '#ff8af0', light: 0.95 },
   'rooftop':       { sky: ['#060a20', '#1a2a5e', '#4a6bd8'], ground: '#5f6a94', tile: '#6d78a4', accent: '#5f86ff', fog: '#1a2a5e', mote: '#9fc2ff', light: 0.95 },
-  'tunnel':        { sky: ['#0a0306', '#3a0712', '#ff2a4d'], ground: '#5c4250', tile: '#6c4c5e', accent: '#ff2a4d', fog: '#2a0710', mote: '#ff6b8a', light: 0.92 },
+  'tunnel':        { sky: ['#101c32', '#35526c', '#76969d'], ground: '#7a8b92', tile: '#657981', accent: '#8ed4dc', fog: '#344d63', mote: '#a3d5dd', light: 0.92 },
 };
 
 // ---------- canvas textures ----------
@@ -919,6 +919,7 @@ class ActionBattle {
         <div class="ab-ctrl"><button class="ctl auto ${this.auto ? 'on' : ''}" aria-pressed="${this.auto}" title="Auto battle (F)">${ic('auto')}<span>AUTO</span></button><button class="ctl pause" title="Pause (Esc)">${ic('pause')}</button></div>
       </div>
       <div class="ab-clock" title="Combat time · travel does not count"><b>0:00</b><small></small></div>
+      <div class="ab-objective"><span>FLOOR OBJECTIVE</span><b></b><i><em></em></i></div>
       <div class="ab-boss hidden"><div class="abb-head"><b class="abb-name"></b><span class="abb-weak"></span><span class="abb-phase"></span></div>
         <div class="abb-hp"><i class="abb-trail"></i><i class="abb-fill"></i><u style="left:50%"></u><u style="left:25%"></u></div><div class="abb-poise"><i></i></div><div class="abb-cast"></div></div>
       ${st.raid ? '<div class="ab-raid"><small>RAID SCORE</small><b>0</b></div>' : ''}
@@ -945,7 +946,7 @@ class ActionBattle {
       <div class="ab-flash"></div>
       <div class="pause-menu hidden"></div>
       <div class="end hidden"></div>`;
-    if (n > 1) this.q('.ab-wave').textContent = `${this.routeEnabled ? 'AREA' : 'WAVE'} 1/${n}`;
+    if (n > 1) this.q('.ab-wave').textContent = `${this.routeEnabled ? 'FLOOR' : 'WAVE'} 1/${n}`;
   }
 
   initScene() {
@@ -981,6 +982,7 @@ class ActionBattle {
       sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
     }
     this.scene.add(sun, sun.target);
+    this.sun = sun;
     this.buildArena(th);
     // Ring under the leader and a lock-on reticle under her current target.
     this.heroRing = new THREE.Mesh(geo('heroRing', () => new THREE.RingGeometry(0.66, 0.74, 48).rotateX(-Math.PI / 2)), new THREE.MeshBasicMaterial({ color: new THREE.Color('#d8f4ff').multiplyScalar(1.3), transparent: true, opacity: 0.6, depthWrite: false }));
@@ -1342,7 +1344,7 @@ class ActionBattle {
     if (this.headless || !u.model || !u.model.root) return;
     u.model.root.position.set(u.pos.x, u.pos.y || 0, u.pos.z);
     u.model.root.rotation.y = u.facing;
-    if (u.shadow) u.shadow.position.set(u.pos.x, 0.012, u.pos.z);
+    if (u.shadow) u.shadow.position.set(u.pos.x, (u.pos.y || 0) + 0.012, u.pos.z);
   }
 
   applyStartBonuses() {
@@ -1421,7 +1423,7 @@ class ActionBattle {
     });
     const n = this.stage.waves.length;
     if (!this.headless) {
-      this.q('.ab-wave').textContent = n > 1 ? `${this.routeEnabled ? 'AREA' : 'WAVE'} ${this.waveIdx + 1}/${n}` : '';
+      this.q('.ab-wave').textContent = n > 1 ? `${this.routeEnabled ? 'FLOOR' : 'WAVE'} ${this.waveIdx + 1}/${n}` : '';
       const boss = this.foes.find(f => f.boss && f.alive);
       this.bossUnit = boss || null;
       this.q('.ab-boss').classList.toggle('hidden', !boss);
@@ -1430,7 +1432,7 @@ class ActionBattle {
         this.q('.abb-weak').innerHTML = `<small>WEAK</small>${(boss.def.weak || []).map(w => elIc(w)).join('')}`;
         this.banner(`BOSS · ${boss.name}`, 'boss');
         sfx('phase');
-      } else if (this.waveIdx > 0) this.banner(`${this.routeEnabled ? 'AREA' : 'WAVE'} ${this.waveIdx + 1}`, 'wave');
+      } else if (this.waveIdx > 0) this.banner(`${this.routeEnabled ? 'FLOOR' : 'WAVE'} ${this.waveIdx + 1}`, 'wave');
     } else this.bossUnit = this.foes.find(f => f.boss && f.alive) || null;
     this.waveClear = false;
   }
@@ -1511,7 +1513,10 @@ class ActionBattle {
     if (this.stick.on) { x = this.stick.x; z = this.stick.z; }
     const d = Math.hypot(x, z);
     if (d < 0.1) return null;
-    return { x: x / Math.max(1, d), z: z / Math.max(1, d) };
+    // Input follows screen directions as the isometric camera swings through a passage.
+    x /= Math.max(1, d); z /= Math.max(1, d);
+    const yaw = this.cam?.yaw || 0, cy = Math.cos(yaw), sy = Math.sin(yaw);
+    return { x: x * cy + z * sy, z: z * cy - x * sy };
   }
 
   // ---------- loop ----------
@@ -1540,6 +1545,7 @@ class ActionBattle {
       if (ev.at <= this.time) { this.events.splice(i, 1); i--; if (!this.disposed) ev.fn(); }
     }
     if (this.phase === 'route') { this.updateRoute(dt); return; }
+    if (this.phase === 'floor-loading') { this.routeTime += dt; return; }
     if (this.phase === 'scene') {
       this.updateScene(dt);
       this.foes.slice().forEach(e => { if (e.dying) this.updateFoe(e, dt); });
@@ -1582,12 +1588,17 @@ class ActionBattle {
       }
     }
     if (this.clouds) this.clouds.rotation.y += raw * 0.012;
+    if (this.expeditionWater) this.expeditionWater.uniforms.time.value += raw;
+    if (this.sun && this.phase === 'route') {
+      this.sun.position.set(this.player.pos.x - 7, 14 + (this.player.pos.y || 0), this.player.pos.z + 6);
+      this.sun.target.position.copy(this.player.pos);
+    }
     if (this.bloom && this.bloom.strength > 0.24) this.bloom.strength = Math.max(0.24, this.bloom.strength - raw * 0.45);
     // Ring under the leader; the reticle sits under whatever she is attacking.
     const h = this.player;
     if (this.heroRing) {
-      this.heroRing.visible = this.phase === 'fight' && h.alive && !this.over && !this.closeUp;
-      this.heroRing.position.x = h.pos.x; this.heroRing.position.z = h.pos.z;
+      this.heroRing.visible = ['fight', 'route'].includes(this.phase) && h.alive && !this.over && !this.closeUp;
+      this.heroRing.position.set(h.pos.x, (h.pos.y || 0) + .025, h.pos.z);
       const t = this.heroRing.visible ? (h.atk_ && h.atk_.tgt && h.atk_.tgt.alive ? h.atk_.tgt : this.nearestFoe(h.pos, 9)) : null;
       this.lockRing.visible = !!t;
       if (t) { this.lockRing.position.x = t.pos.x; this.lockRing.position.z = t.pos.z; this.lockRing.scale.setScalar(t.r * 1.3 + 0.35); this.lockRing.rotation.y += raw * 1.6; }
@@ -1647,7 +1658,8 @@ class ActionBattle {
     cam.yaw += (cam.to.yaw - cam.yaw) * kc; cam.dist += (cam.to.dist - cam.dist) * kc; cam.h += (cam.to.h - cam.h) * kc;
     this.camZoom += (this.camZoomTo - this.camZoom) * (1 - Math.exp(-raw * 6));
     const c = this.camera, z = this.camZoom, sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
-    c.position.set(at.x + sy * cam.dist * z, cam.h * z, at.z + cy * cam.dist * z);
+    const routeY = this.phase === 'route' ? h.pos.y || 0 : 0;
+    c.position.set(at.x + sy * cam.dist * z, cam.h * z + routeY, at.z + cy * cam.dist * z);
     const s = this.shake * this.shake * (SAVE.settings.shake === false ? 0 : 0.5);
     if (s > 0.001) c.position.add(new THREE.Vector3((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, (Math.random() - 0.5) * s));
     this.shake = Math.max(0, this.shake - raw * 2.2);
@@ -1658,7 +1670,7 @@ class ActionBattle {
       c.updateProjectionMatrix();
     }
     const lookY = this.camFocus ? 0.9 : 0.75 + (1 - z) * 0.35;
-    c.lookAt(at.x - sy * 0.6, lookY, at.z - cy * 0.6);
+    c.lookAt(at.x - sy * 0.6, lookY + routeY, at.z - cy * 0.6);
   }
 
   // ---------- hero ----------
@@ -2888,59 +2900,103 @@ class ActionBattle {
   // ---------- wave flow & end ----------
   beginRoute() {
     if (this.over || this.disposed || this.phase !== 'fight') return;
-    this.phase = 'route'; this.routeWalking = this.auto;
+    this.phase = 'route'; this.routeWalking = this.auto; this.routeCursor = 0;
     this.player.atk_ = null; this.player.busy = 0; this.player.dodgeTime = 0;
     this.supports.forEach(s => { s.on = 0; if (s.model?.root) s.model.root.visible = false; if (s.shadow) s.shadow.visible = false; });
     this.zones.forEach(z => this.removeZone(z)); this.zones = [];
     this.projectiles.forEach(p => { if (p.mesh) this.scene.remove(p.mesh); }); this.projectiles = [];
-    this.camFocus = null; this.cam.to = battleCam();
+    this.events = []; this.puddles = []; this.pulses = [];
+    this.camFocus = null; this.cam.to = { yaw: -.22, dist: 10.6, h: 11.8 };
     this.root.classList.add('travelling');
+    if (this.expeditionWorld) this.expeditionWorld.visible = true;
     const go = document.createElement('button'); go.className = 'ab-route';
-    go.innerHTML = `<span>Continue to area ${this.waveIdx + 2}<small>Explore with WASD / stick · Enter for assisted walking</small></span>${ic('next')}`;
+    go.innerHTML = `<span>Next floor<small>WASD / stick to explore · Enter for assisted walking</small></span>${ic('next')}`;
     go.onclick = () => this.setRouteWalking(!this.routeWalking);
-    this.root.appendChild(go);
-    this.routeButton = go; this.setRouteWalking(this.auto);
-    if (this.routeMarkers) this.routeMarkers[this.waveIdx].visible = true;
+    this.root.appendChild(go); this.routeButton = go; this.setRouteWalking(this.auto);
+    const talk = FIELD[this.stage.id]?.end?.find(l => CHARACTERS[l[0]]);
+    if (talk) {
+      const box = document.createElement('aside'); box.className = 'ab-walk-talk';
+      box.innerHTML = `<img src="${ART[talk[0]].url}" alt="${CHARACTERS[talk[0]].name}"><div><b>${CHARACTERS[talk[0]].short}</b><p></p></div>`;
+      box.querySelector('p').textContent = talk[1]; this.root.appendChild(box);
+    }
   }
 
   setRouteWalking(on) {
     this.routeWalking = on;
     if (!this.routeButton) return;
     this.routeButton.classList.toggle('walking', on);
-    this.routeButton.querySelector('span').firstChild.nodeValue = on ? 'Stop assisted walking' : `Continue to area ${this.waveIdx + 2}`;
+    this.routeButton.querySelector('span').firstChild.nodeValue = on ? 'Following the path' : `Next floor · ${this.waveIdx + 2}`;
   }
 
   updateRoute(dt) {
     this.routeTime += dt;
-    const h = this.player, input = this.moveInput();
+    const h = this.player, input = this.moveInput(), points = SpoExpedition.points;
     let dx = input ? input.x : 0, dz = input ? input.z : 0;
     if (!input && this.routeWalking) {
-      dx = -h.pos.x; dz = -30 - h.pos.z;
-      const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
+      const target = points[this.routeCursor]; dx = target[0] - h.pos.x; dz = target[2] - h.pos.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance < .65 && this.routeCursor < points.length - 1) this.routeCursor++;
+      const d = distance || 1; dx /= d; dz /= d;
     }
-    const moving = Math.hypot(dx, dz) > .05;
-    if (moving) {
+    if (Math.hypot(dx, dz) > .05) {
       h.pos.x += dx * ACT.speed * dt; h.pos.z += dz * ACT.speed * dt;
-      // The passage between courtyards is narrow; movement within each area stays free.
-      const halfWidth = h.pos.z < -14.5 && h.pos.z > -19.5 ? 3.4 : 14;
-      h.pos.x = Math.max(-halfWidth, Math.min(halfWidth, h.pos.x));
-      h.pos.z = Math.max(-31, Math.min(14, h.pos.z));
+      if (h.pos.z >= -13) {
+        h.pos.x = Math.max(-14, Math.min(14, h.pos.x)); h.pos.z = Math.min(14, h.pos.z); h.pos.y = 0;
+      } else {
+        const q = SpoExpedition.project(h.pos.x, h.pos.z, this.routeProjection), radius = 2.2;
+        if (q.distance > radius) {
+          const k = radius / q.distance; h.pos.x = q.x + (h.pos.x - q.x) * k; h.pos.z = q.z + (h.pos.z - q.z) * k;
+        }
+        h.pos.y = q.y;
+        if (input) this.routeCursor = Math.min(points.length - 1, q.index + 1);
+      }
       h.facing = turnTo(h.facing, Math.atan2(dx, dz), dt * 12); h.model.setState('run');
     } else h.model.setState('idle');
     this.updatePickups(dt);
-    if (h.pos.z > -27 || Math.abs(h.pos.x) > 6) return;
-    // Rebase the world together with the camera: collision and skill maths stay local.
-    this.routeWorld.position.z += 34;
-    if (this.paintedPanorama) this.paintedPanorama.position.z += 34;
-    h.pos.z += 34; h.vel.set(0, 0, 0);
-    this.camAt.z += 34; this.camera.position.z += 34;
-    this.foes.forEach(e => { if (e.model) { this.scene.remove(e.model.root); e.model.dispose(); } if (e.shadow) this.scene.remove(e.shadow); if (e.bar) e.bar.remove(); });
-    this.foes = [];
-    this.pickups.forEach(p => { if (p.mesh) this.scene.remove(p.mesh); }); this.pickups = [];
-    this.root.querySelector('.ab-route')?.remove(); this.root.classList.remove('travelling');
-    this.routeButton = null;
-    if (this.routeMarkers) this.routeMarkers[this.waveIdx].visible = false;
-    this.want = null; this.queuedAction = null; this.waveIdx++; this.phase = 'fight'; this.spawnWave();
+    const end = points[points.length - 1];
+    if (Math.hypot(h.pos.x - end[0], h.pos.z - end[2]) < 1.25) this.loadNextFloor(this.waveIdx + 1);
+  }
+
+  async loadNextFloor(next) {
+    if (this.disposed || this.over || this.phase === 'floor-loading') return;
+    this.phase = 'floor-loading'; this.player.model.setState('idle');
+    this.root.querySelector('.ab-route')?.remove(); this.root.querySelector('.ab-walk-talk')?.remove(); this.routeButton = null;
+    const layer = document.createElement('section'); layer.className = 'ab-floor-loading';
+    layer.setAttribute('role', 'status'); layer.setAttribute('aria-live', 'polite');
+    layer.innerHTML = `<div class="afl-art" style="${SpoEnvironment.storyStyle(stageBg(this.stage))}"></div><div class="afl-shade"></div><div class="afl-heading"><small>WATA SPO / NEXT FLOOR</small><h2>${this.stage.name}</h2><b>Floor ${next + 1} <span>/ ${this.stage.waves.length}</span></b></div><div class="afl-progress"><span>Preparing scenery</span><i><em></em></i><small>Your squad's HP, Energy and cooldowns carry forward.</small></div>`;
+    this.root.appendChild(layer); const started = performance.now();
+    try {
+      await SpoEnvironment.load(); if (this.disposed) return;
+      this.foes.forEach(e => { if (e.model) { this.scene.remove(e.model.root); e.model.dispose(); } if (e.shadow) this.scene.remove(e.shadow); e.bar?.remove(); e.off?.remove(); }); this.foes = [];
+      this.pickups.forEach(p => { if (p.mesh) this.scene.remove(p.mesh); }); this.pickups = [];
+      this.fx.list.forEach(f => { this.scene.remove(f.obj); if (f.done) f.done(); }); this.fx.list = [];
+      SpoExpedition.clearEnvironment(this);
+      const th = ARENA_THEMES[stageBg(this.stage)] || ARENA_THEMES['street-day'];
+      this.waveIdx = next; SpoEnvironment.build(this, th);
+      this.sun.position.set(-7, 14, 6); this.sun.target.position.set(0, 0, 0);
+      this.player.pos.set(0, 0, 6); this.player.vel.set(0, 0, 0); this.player.facing = Math.PI;
+      this.camAt.set(0, 0, 5); this.camLook.set(0, 0, 0); this.cam.to = battleCam();
+      this.cam.yaw = this.cam.to.yaw; this.cam.h = this.cam.to.h; this.cam.dist = this.cam.to.dist;
+      this.syncModel(this.player);
+      layer.querySelector('.afl-progress > span').textContent = 'Preparing the next floor'; layer.style.setProperty('--progress', '60%');
+      if (typeof this.renderer.compileAsync === 'function') await this.renderer.compileAsync(this.scene, this.camera);
+      else this.renderer.compile(this.scene, this.camera);
+      if (this.disposed) return;
+      layer.style.setProperty('--progress', '100%'); layer.querySelector('.afl-progress > span').textContent = 'Floor ready';
+      await new Promise(r => setTimeout(r, Math.max(0, 1000 - (performance.now() - started))));
+      if (this.disposed) return;
+      layer.classList.add('leaving'); await new Promise(r => setTimeout(r, 180));
+      if (this.disposed) return;
+      layer.remove(); this.root.classList.remove('travelling'); this.want = null; this.queuedAction = null;
+      this.phase = 'fight'; this.spawnWave();
+    } catch (error) {
+      if (this.disposed) return;
+      console.error('Floor preparation failed', error);
+      layer.querySelector('.afl-progress > span').textContent = 'The next floor could not be prepared.';
+      const retry = document.createElement('button'); retry.textContent = 'Retry floor loading';
+      retry.onclick = () => { layer.remove(); this.phase = 'route'; this.loadNextFloor(next); };
+      layer.querySelector('.afl-progress').appendChild(retry); retry.focus();
+    }
   }
 
   checkWave() {
@@ -3038,9 +3094,10 @@ class ActionBattle {
     const end = this.q('.end');
     end.classList.add('ab-end');
     const resultBg = st.bg || stageBg(st);
-    if (BACKGROUNDS[resultBg]) end.style.backgroundImage = `linear-gradient(90deg,#f5f8ea55,#f5f8eabf),${SpoEnvironment.storyStyle(resultBg).split(';')[0].replace('background-image:', '')}`;
+    if (BACKGROUNDS[resultBg]) end.style.backgroundImage = `linear-gradient(90deg,#0b172b4d,#0b172bed 67%),${SpoEnvironment.storyStyle(resultBg).split(';')[0].replace('background-image:', '')}`;
     end.innerHTML = `
       <img class="abe-illustration" src="${ART[mvp.id].url}" alt="${mvp.def.name}">
+      <div class="abe-mvp"><small>${win ? 'MVP / TOP DAMAGE' : 'SQUAD LEADER'}</small><b>${mvp.def.name}</b></div>
       <div class="abe-quote" style="--c:${mvp.def.color}"><em>${win ? 'MVP · ' : ''}${mvp.def.short}</em>${voice(mvp.id, win ? 'victory' : 'ko')}</div>
       <div class="end-box ${win ? 'win' : 'lose'}" role="dialog" aria-modal="true" aria-labelledby="abe-title">
         <div class="abe-kicker">${st.raid ? 'RANKED RAID' : win ? 'STREAM COMPLETE' : 'STREAM ENDED'}<span>${st.id || ''}</span></div>
@@ -3221,6 +3278,20 @@ class ActionBattle {
       cb.classList.remove('hidden');
       if (this.hudCombo !== this.combo) { this.hudCombo = this.combo; cb.querySelector('b').textContent = this.combo; cb.classList.remove('pop'); void cb.offsetWidth; cb.classList.add('pop'); }
     } else cb.classList.add('hidden');
+    // Remaining targets are the floor objective; bosses keep their dedicated health bar.
+    const objective = this.q('.ab-objective');
+    const objectiveVisible = this.phase === 'fight' && !this.over && !this.bossUnit;
+    objective.classList.toggle('hidden', !objectiveVisible);
+    if (objectiveVisible) {
+      let remaining = 0;
+      for (let i = 0; i < this.foes.length; i++) if (this.foes[i].alive) remaining++;
+      const state = remaining + ':' + this.foes.length;
+      if (this.hudTargets !== state) {
+        this.hudTargets = state;
+        objective.querySelector('b').textContent = remaining + (remaining === 1 ? ' target remaining' : ' targets remaining');
+        objective.querySelector('em').style.width = (remaining / Math.max(1, this.foes.length) * 100) + '%';
+      }
+    }
     // boss bar
     const b = this.bossUnit;
     if (b) {
@@ -3239,9 +3310,9 @@ class ActionBattle {
     // Small health bar under the leader's feet.
     const h = this.player;
     if (!this.heroBar) { this.heroBar = document.createElement('div'); this.heroBar.className = 'abl-herobar'; this.heroBar.innerHTML = '<i class="f"></i><s></s>'; this.q('.ab-labels').appendChild(this.heroBar); }
-    v.set(h.pos.x, 0, h.pos.z).project(this.camera);
+    v.set(h.pos.x, h.pos.y || 0, h.pos.z).project(this.camera);
     this.heroBar.style.transform = `translate(${(v.x * 0.5 + 0.5) * w}px, ${(-v.y * 0.5 + 0.5) * hgt + 12}px)`;
-    this.heroBar.style.display = this.phase === 'fight' && h.alive && !this.over && !this.closeUp ? '' : 'none';
+    this.heroBar.style.display = ['fight', 'route'].includes(this.phase) && h.alive && !this.over && !this.closeUp ? '' : 'none';
     this.heroBar.firstChild.style.width = Math.max(0, h.hp / h.maxHp * 100) + '%';
     this.heroBar.lastChild.style.width = Math.min(100, h.shield / h.maxHp * 100) + '%';
     this.heroBar.classList.toggle('low', h.hp < h.maxHp * 0.3);
@@ -3447,7 +3518,7 @@ class ActionBattle {
     const st = this.stage, el = this.q('.ab-title');
     el.querySelector('b').textContent = st.name;
     el.querySelector('span').textContent = st.raid ? 'RANKED RAID' : st.run ? 'BRACKET RUN' : st.tower ? `STREAM TOWER · FLOOR ${st.floor}/${TOWER_FLOORS}`
-      : st.event ? 'EVENT' : st.daily ? 'DAILY STREAM' : `STAGE ${st.id}${this.stage.waves.length > 1 ? ` · ${this.stage.waves.length} ${this.routeEnabled ? 'AREAS' : 'WAVES'}` : ''}`;
+      : st.event ? 'EVENT' : st.daily ? 'DAILY STREAM' : `STAGE ${st.id}${this.stage.waves.length > 1 ? ` · ${this.stage.waves.length} ${this.routeEnabled ? 'FLOORS' : 'WAVES'}` : ''}`;
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   }
 
@@ -3504,10 +3575,10 @@ const SHOT_STYLE = {
 const RAID_HP_MULT_A = 12;
 const CHIBI_SCALE = 1.15;   // members are drawn a little bigger than their hit circles
 // Battle camera: high and fairly far back, so you see the whole fight around you.
-const BATTLE_CAM = { yaw: 0, dist: 11.5, h: 10.5 };
+const BATTLE_CAM = { yaw: -.28, dist: 12.4, h: 12 };
 // Camera distance setting (pause menu): multiplies the battle camera's distance and height.
 const CAM_ZOOM = { close: 0.8, normal: 1, far: 1.22 };
-const battleCam = () => { const k = CAM_ZOOM[SAVE.settings.camDist] || 1; return { yaw: 0, dist: BATTLE_CAM.dist * k, h: BATTLE_CAM.h * k }; };
+const battleCam = () => { const k = CAM_ZOOM[SAVE.settings.camDist] || 1; return { yaw: BATTLE_CAM.yaw, dist: BATTLE_CAM.dist * k, h: BATTLE_CAM.h * k }; };
 // Where the cast stands during the opening scene: leader in front, supports and guests fanned out behind.
 const SCENE_MARKS = [[0, 3.0], [-1.6, 3.3], [1.6, 3.3], [-3.1, 3.9], [3.1, 3.9], [-4.5, 4.7], [4.5, 4.7]];
 

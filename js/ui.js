@@ -21,6 +21,7 @@ function show(id) {
 }
 
 function wipe(big) {
+  if (big) return; // Battle entry has its own illustrated loading screen.
   const w = document.createElement('div');
   const calm = SAVE.settings.flashes === false || matchMedia('(prefers-reduced-motion: reduce)').matches;
   w.className = 'studio-wipe' + (big && !calm ? ' studio-battle-wipe' : calm ? ' calm' : '');
@@ -139,24 +140,23 @@ RENDER.lobby = () => {
     newTalks() && `${newTalks()} new off-stream talk${newTalks() > 1 ? 's' : ''} unlocked`,
   ].filter(Boolean);
   $('#lobby').innerHTML = `
-    <div class="home studio-home ${sid || video ? 'scene-mode' : ''} ${video ? 'video-mode' : ''}" style="--c:${c.color}">
+    <div class="home studio-home cinema-home ${sid || video ? 'scene-mode' : ''} ${video ? 'video-mode' : ''}" style="--c:${c.color}">
       <header class="studio-top">
         <div class="home-profile"><button class="face home-avatar" style="${faceStyle(profileData().avatar)}" title="Profile"></button><div class="home-prof-main"><input class="home-name" maxlength="14" value="${p.name.replace(/"/g, '&quot;')}" title="Tap to rename"><div class="home-rank"><b>RANK ${p.rank}</b><div class="home-xp"><i style="width:${p.xp / need * 100}%"></i></div><small>${p.xp}/${need}</small></div></div></div>
-        <span class="studio-date">YOUR NEXT GOOD STORY</span>${curHtml()}
+        <span class="studio-date">${greeting.toUpperCase()}, PRODUCER</span>${curHtml()}
       </header>
       <nav class="studio-rail" aria-label="Main navigation">
         <div class="home-logo">${logoHtml()}</div>
-        <button class="rail-home selected" data-go="lobby">${ic('live')}<span>Home</span></button>
         <button data-go="stages">${ic('story')}<span>Journey</span></button>
         <button class="studio-squad">${ic('team')}<span>Squad</span></button>
         <button data-go="members">${ic('members')}<span>Members</span></button>
         <button data-go="recruit">${ic('recruit')}<span>Recruit</span>${daily().freePull ? '' : '<i class="rail-dot"></i>'}</button>
-        <div class="rail-space"></div>
+        <button data-live="event">${ic('live')}<span>Live</span></button>
         <button data-go="missions">${ic('missions')}<span>Missions</span>${badge(missionBadge())}</button>
         <button data-act="menu">${ic('menu')}<span>More</span></button>
       </nav>
       <main class="studio-canvas">
-        <div class="studio-art-caption"><span>OFF THE CLOCK / ${String(Object.keys(CHARACTERS).indexOf(id) + 1).padStart(2, '0')}</span><b>${c.name}</b></div>
+        <div class="studio-art-caption"><span>OFF-STREAM MOMENT</span><b>${c.name}</b></div>
         <div class="home-bg">
           ${video ? `<video class="home-video" src="${video.src}" autoplay muted loop playsinline></video>` : sid ? `<div class="home-scene" style="${sceneStyle(sid)}"></div>` : `<div class="lobby-art"><img src="${ART[id].url}" alt="${c.name}"></div>`}
         </div>
@@ -166,7 +166,7 @@ RENDER.lobby = () => {
       </main>
       <aside class="studio-journey">
         <div class="studio-eyebrow">CHAPTER ${String(ch.id).padStart(2, '0')} <span>${STAGES.filter(s => s.chapter === ch.id && SAVE.cleared[s.id]).length} / ${STAGES.filter(s => s.chapter === ch.id).length} CLEARED</span></div>
-        <h1>${ch.name}</h1><p class="studio-intro">A story worth coming back to.<br>${SAVE.team.filter(Boolean).length < 3 ? 'Add your new member in Squad before you set out.' : teamAvgLv() < recLevel(nextStage.level) ? 'Train your squad for the encounter ahead.' : 'Your squad is ready for the next encounter.'}</p>
+        <h1>${ch.name}</h1>
         <div class="studio-next"><span>NEXT UP <b>${nextStage.id}</b></span><h2>${nextStage.name}</h2><small>${nextStage.boss ? 'Boss encounter' : 'Story encounter'} · Recommended Lv ${recLevel(nextStage.level)}</small></div>
         <button class="home-continue studio-primary"><span>${SAVE.cleared[nextStage.id] ? 'Play again' : 'Continue journey'}</span>${ic('next')}</button>
         <button class="studio-route" data-go="stages">View chapter route <span>→</span></button>
@@ -517,7 +517,7 @@ RENDER.recruit = () => {
           ${st.g && b.upChance < 1 ? '<span class="r5">Next ★5 is the rate-up</span>' : ''}
           ${b.upChance >= 1 ? '<span class="r5">Every ★5 here is the rate-up</span>' : ''}</div>
         <div class="rc-spark">
-          <div class="rc-spark-head"><span>${ic('spark')} SPARK</span><b>${Math.min(spark, SPARK_COST)}/${SPARK_COST}</b></div>
+          <div class="rc-spark-head"><span>${ic('spark')} SPARK</span><b>${spark}/${SPARK_COST}</b></div>
           <div class="rc-spark-bar"><i style="width:${Math.min(100, spark / SPARK_COST * 100)}%"></i></div>
           <button class="pill ${spark >= SPARK_COST ? 'yellow' : 'dark'} exchange" ${spark >= SPARK_COST ? '' : 'disabled'}>Exchange for ${info.upName.split(' ')[0]}</button>
         </div>
@@ -559,16 +559,7 @@ RENDER.recruit = () => {
   document.querySelectorAll('#recruit .pull').forEach(btn => btn.onclick = () => doRecruit(bid, Number(btn.dataset.n)));
   const free = $('#recruit .free-pull');
   if (free) free.onclick = () => { const res = recruit(bid, 1, true); if (res) playPull(res, bid, 1); };
-  $('#recruit .exchange').onclick = async () => {
-    const res = sparkExchange(bid);
-    if (!res) return;
-    const ov = $('#pull');
-    ov.className = 'overlay show'; ov.innerHTML = '';
-    sfx('pull5');
-    await showSplash(ov, res);
-    ov.className = 'overlay'; ov.innerHTML = '';
-    RENDER.recruit();
-  };
+  $('#recruit .exchange').onclick = () => openSparkOffer(bid);
   if (DEV) $('#recruit .dev').onclick = () => { SAVE.gems += 1600; persist(); RENDER.recruit(); };
   $('#recruit .rates').onclick = () => openRates(bid);
   $('#recruit .history').onclick = () => openHistory();
@@ -588,27 +579,54 @@ function doRecruit(bid, n) {
 }
 
 function openModal(html) {
-  const ov = $('#pull');
+  const ov = $('#pull'), previousFocus = document.activeElement;
   ov.className = 'overlay show';
-  ov.innerHTML = `<div class="picker"><div class="picker-box">${html}</div></div>`;
-  const close = () => { ov.className = 'overlay'; ov.innerHTML = ''; };
+  ov.innerHTML = `<div class="picker"><div class="picker-box" role="dialog" aria-modal="true" aria-label="Recruit information">${html}</div></div>`;
+  const close = () => { ov.className = 'overlay'; ov.innerHTML = ''; ov.onkeydown = null; previousFocus?.focus(); };
   ov.querySelector('.picker').onclick = e => { if (e.target.classList.contains('picker') || e.target.closest('.close')) close(); };
+  ov.onkeydown = e => {
+    if (e.key === 'Escape') { e.stopPropagation(); close(); }
+    if (e.key === 'Tab') {
+      const items = [...ov.querySelectorAll('button:not(:disabled),a[href],select')];
+      if (!items.length) return;
+      if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items[items.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === items[items.length - 1]) { e.preventDefault(); items[0].focus(); }
+    }
+  };
+  ov.querySelector('button')?.focus();
+}
+
+function openSparkOffer(bid) {
+  const info = bannerInfo(bid), b = info.b;
+  openModal(`<div class="picker-head"><h3>Guaranteed recruit</h3><button class="btn small close" aria-label="Close exchange">${ic('close')}</button></div>
+    <div class="spark-offer"><div class="spark-portrait" style="${info.isMem ? memArtStyle(b.rateUp) : `background-image:url('${ART[b.rateUp].url}');background-size:contain;background-position:center bottom`}"></div><div><small>★5 · ${info.isMem ? 'MEMORY' : 'MEMBER'}</small><h3>${info.upName}</h3>
+      <p>Exchange spark points for this featured ${info.isMem ? 'Memory' : 'member'}. Your recruit pity stays unchanged.</p>
+      <dl><dt>Owned spark</dt><dd>${SAVE.spark[b.pity] || 0}</dd><dt>Exchange cost</dt><dd>${SPARK_COST}</dd></dl>
+      <button class="pill blue spark-confirm" ${(SAVE.spark[b.pity] || 0) < SPARK_COST ? 'disabled' : ''}>Exchange · ${SPARK_COST} spark</button></div></div>`);
+  $('#pull .spark-confirm').onclick = async () => {
+    const res = sparkExchange(bid);
+    if (!res) return;
+    const ov = $('#pull'); ov.onkeydown = null;
+    ov.className = 'overlay show'; ov.innerHTML = '';
+    sfx('pull5'); await showSplash(ov, res);
+    ov.className = 'overlay'; ov.innerHTML = ''; RENDER.recruit();
+  };
 }
 
 function openRates(bid) {
   const b = BANNERS[bid], isMem = b.type === 'memory';
   const nameOf = id => isMem ? MEMORIES[id].name : CHARACTERS[id].name;
-  openModal(`<div class="picker-head"><h3>Rates · ${b.name}</h3><button class="btn small close">${ic('close')}</button></div>
-    <ul class="rates">
-      <li><span class="r5">★5</span> ${(b.rate5 * 100).toFixed(1)}% · guaranteed within ${b.pity5} pulls</li>
-      <li><span class="r4">★4</span> ${(b.rate4 * 100).toFixed(0)}% · guaranteed every ${b.pity4} pulls</li>
-      <li><span class="r3">★3</span> Superchat Tokens ×${ITEM_EXP} (level-up items)</li>
-      <li>${b.upChance >= 1 ? `Every ★5 on this banner is ${nameOf(b.rateUp)}.`
-        : `${Math.round(b.upChance * 100)}% for ${nameOf(b.rateUp)} on a ★5. Lose it and the next ★5 is guaranteed to be the rate-up.`}</li>
-      <li>★5 pool: ${b.pool5.map(nameOf).join(', ')}</li>
-      <li>★4 pool: ${b.pool4.map(nameOf).join(', ')}</li>
-      <li>${isMem ? 'Memory' : 'Member'} banners share pity and the guarantee. Duplicates ${isMem ? 'raise Rank (max 5)' : 'give a duplicate token to unlock nodes on the Members screen (max 5)'}.</li>
-    </ul>`);
+  const row = (id, rarity, rate) => `<tr><td><i class="face" style="${faceStyle(isMem ? MEMORIES[id].owner : id)}"></i><span class="r${rarity}">★${rarity}</span> ${nameOf(id)}${id === b.rateUp ? ' <em>Featured</em>' : ''}</td><td>${(rate * 100).toFixed(4)}%</td></tr>`;
+  const others = b.pool5.filter(id => id !== b.rateUp);
+  openModal(`<div class="picker-head"><h3>Recruit rates</h3><button class="btn small close" aria-label="Close rates">${ic('close')}</button></div>
+    <p class="rates-banner">${b.name}</p><div class="rates-summary"><span class="r5">★5 <b>${(b.rate5 * 100).toFixed(1)}%</b></span><span class="r4">★4 <b>${(b.rate4 * 100).toFixed(1)}%</b></span><span class="r3">★3 <b>${((1 - b.rate5 - b.rate4) * 100).toFixed(1)}%</b></span></div>
+    <p class="rates-note">Base rates for a regular draw. Pity guarantees override these rates: ★5 within ${b.pity5} pulls; ★4 or higher within ${b.pity4} pulls.</p>
+    <div class="rates-table"><table><thead><tr><th>Result</th><th>Base chance</th></tr></thead><tbody>
+      ${row(b.rateUp, 5, b.rate5 * b.upChance)}${others.map(id => row(id, 5, b.rate5 * (1 - b.upChance) / others.length)).join('')}
+      ${b.pool4.map(id => row(id, 4, b.rate4 / b.pool4.length)).join('')}
+      <tr><td><span class="r3">★3</span> Superchat Tokens ×${ITEM_EXP}</td><td>${((1 - b.rate5 - b.rate4) * 100).toFixed(4)}%</td></tr>
+    </tbody></table></div>
+    <p class="rates-note">${b.upChance >= 1 ? 'Every ★5 is the featured result.' : 'After a non-featured ★5, your next ★5 is guaranteed to be featured.'} ${isMem ? 'Memory' : 'Member'} banners share pity. Duplicates ${isMem ? 'raise Memory Rank (max 5)' : 'give duplicate tokens for member nodes (max 5)'}. At the duplicate limit they convert to gems. Values are rounded for display.</p>`);
 }
 
 function openBannerDetail(bid) {
@@ -750,7 +768,8 @@ async function playPull(results, bid, n, onClose = null) {
   if (await pullTicket(ov, results, bid, n) === 'go') {
     // The star starts blue and "upgrades" to purple / gold to tease the best result.
     ov.innerHTML = `<div class="pull-scene tease"><div class="sky"></div><div class="portal"></div><div class="meteor"></div><div class="flash"></div>
-      <div class="pull-signal"><span>CONNECTING TO THE STAGE</span><div>${'<i></i>'.repeat(7)}</div><b>INCOMING SIGNAL</b></div>
+      <div class="pull-orbit" aria-hidden="true">${results.map((_, i) => `<i style="--i:${i};--n:${results.length}">${ic('spark')}</i>`).join('')}</div>
+      <div class="pull-signal"><span>STREAM LINK / RECRUITMENT</span><div>${'<i></i>'.repeat(7)}</div><b>A NEW CONNECTION</b></div>
       <div class="tease-stars"></div><div class="skip">Tap to skip</div></div>`;
     const scene = ov.querySelector('.pull-scene');
     const upgrade = (tier, at) => setTimeout(() => {
@@ -758,7 +777,7 @@ async function playPull(results, bid, n, onClose = null) {
       scene.classList.remove('t3', 't4', 't5', 'bump'); void scene.offsetWidth;
       scene.classList.add(`t${tier}`, 'bump');
       scene.querySelector('.tease-stars').textContent = '★'.repeat(tier);
-      scene.querySelector('.pull-signal b').textContent = tier === 5 ? 'GOLD SIGNAL / ★5' : tier === 4 ? 'VIOLET SIGNAL / ★4' : 'BLUE SIGNAL / ★3';
+      scene.querySelector('.pull-signal b').textContent = tier === 5 ? 'A STAR ANSWERS / ★5' : tier === 4 ? 'VIOLET RESONANCE / ★4' : 'BLUE RESONANCE / ★3';
       sfx(`pull${tier}`);
     }, at);
     upgrade(3, 350);
@@ -1570,7 +1589,7 @@ RENDER.stages = () => {
           const locked = !stageUnlocked(o.i), cleared = !!SAVE.cleared[o.st.id], stars = SAVE.stars[o.st.id] || [];
           const bossId = o.st.waves.flat().find(e => ENEMIES[e].boss);
           return `<button class="snode ${o.st.boss ? 'boss' : ''} ${locked ? 'locked' : ''} ${cleared ? 'cleared' : ''} ${o.st.id === stagesSel ? 'sel' : ''} ${next && o.st.id === next.st.id ? 'next' : ''}"
-            data-id="${o.st.id}" style="left:${pts[k][0]}%;top:${pts[k][1]}%" ${locked ? 'disabled' : ''}>
+            data-id="${o.st.id}" style="--node-x:${pts[k][0]}%;--node-y:${pts[k][1]}%" ${locked ? 'disabled' : ''}>
             <span class="snode-core">${bossId ? enemyFace(bossId) : `<b>${o.st.id.split('-')[1]}</b>`}${locked ? `<i class="snode-lock">${ic('lock')}</i>` : ''}</span>
             ${next && o.st.id === next.st.id ? '<span class="snode-flag">NEXT</span>' : ''}
             <span class="snode-stars">${[0, 1, 2].map(s => `<i class="${stars[s] ? 'on' : ''}">${ic('star')}</i>`).join('')}</span>
@@ -1631,8 +1650,9 @@ function nextStageOf(st) {
 async function startBattle(stage) {
   const team = SAVE.team.filter(Boolean);
   show('battle');
+  const enteredAt = performance.now();
   // Battles are real-time 3D: wait for three.js (and any member models) first.
-  $('#battle').innerHTML = `<div class="ab-loading"><div class="logo">${logoHtml()}</div><b>Entering the arena…</b><i></i></div>`;
+  $('#battle').innerHTML = `<section class="ab-floor-loading" role="status" aria-live="polite"><div class="afl-art" style="${SpoEnvironment.storyStyle(stageBg(stage))}"></div><div class="afl-shade"></div><div class="afl-heading"><small>WATA SPO / EXPEDITION</small><h2>${stage.name}</h2><b>Floor ${stage.floor || 1} <span>/ ${stage.tower ? TOWER_FLOORS : stage.waves.length}</span></b></div><div class="afl-progress"><span>Preparing scenery and squad</span><i><em></em></i><small>Explore each passage, then enter the next floor.</small></div></section>`;
   if (!(await whenThree())) {
     toast('The 3D battle engine could not load. Check your internet connection and try again.');
     if (stage.hub) { liveTab = stage.hub; return show('live'); }
@@ -1640,6 +1660,7 @@ async function startBattle(stage) {
   }
   await loadChibiModels();
   await SpoEnvironment.load();
+  await new Promise(r => setTimeout(r, Math.max(0, 1000 - (performance.now() - enteredAt))));
   currentBattle = new ActionBattle($('#battle'), stage, team, async (reason, won) => {
     currentBattle = null;
     if (reason === 'retry') return startBattle(stage);

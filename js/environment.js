@@ -4,9 +4,12 @@ const SpoEnvironment = {
   slate: null,
   loading: null,
   textures: {},
+  pending: {},
   texture(file) {
     if (!this.textures[file]) {
-      const map = new THREE.TextureLoader().load('assets/environment/' + file);
+      let complete;
+      this.pending[file] = new Promise(resolve => { complete = resolve; });
+      const map = new THREE.TextureLoader().load('assets/environment/' + file, complete, undefined, complete);
       map.colorSpace = THREE.SRGBColorSpace;
       this.textures[file] = map;
     }
@@ -16,6 +19,7 @@ const SpoEnvironment = {
     if (!this.loading) this.loading = Promise.all([
       loadImage('assets/environment/painted-limestone.jpg').then(img => { this.ground = img; }).catch(() => {}),
       loadImage('assets/environment/painted-slate.jpg').then(img => { this.slate = img; }).catch(() => {}),
+      ...['painted-garden-tree.png', 'painted-cafe.png', 'seaside-promenade.jpg', 'evening-lane.jpg', 'rooftop-garden.jpg', 'underground-passage.jpg'].map(file => { this.texture(file); return this.pending[file]; }),
     ]);
     return this.loading;
   },
@@ -56,6 +60,25 @@ const SpoEnvironment = {
     map.anisotropy = 4;
     return map;
   },
+  inlay(variant) {
+    return canvasTex('civic-inlay:' + variant % 3, 512, 512, g => {
+      const size = 512;
+      // Each floor has its own civic inlay, keeping the combat centre readable.
+      g.save(); g.translate(size / 2, size / 2);
+      g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(2, size / 400);
+      const radius = size * .31;
+      if (variant % 3 === 0) {
+        for (const r of [radius, radius * .92, radius * .48]) { g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.stroke(); }
+        for (let i = 0; i < 8; i++) { g.save(); g.rotate(i * Math.PI / 4); g.beginPath(); g.moveTo(0, -radius * .48); g.lineTo(0, -radius * .92); g.stroke(); g.restore(); }
+      } else if (variant % 3 === 1) {
+        for (const offset of [-.3, .3]) { g.strokeRect(size * offset - size * .025, -size / 2, size * .05, size); }
+        g.rotate(Math.PI / 4); g.strokeRect(-radius * .55, -radius * .55, radius * 1.1, radius * 1.1);
+      } else {
+        for (const r of [radius, radius * .88]) { g.beginPath(); for (let i = 0; i <= 8; i++) { const a = i / 8 * Math.PI * 2; g.lineTo(Math.sin(a) * r, Math.cos(a) * r); } g.stroke(); }
+      }
+      g.restore();
+    });
+  },
   foliage(th) {
     return canvasTex('studio-tree:' + th.outdoor + ':' + th.ground, 256, 384, g => {
       g.fillStyle = '#665d4b'; g.beginPath(); g.moveTo(116, 374); g.lineTo(124, 153); g.lineTo(136, 153); g.lineTo(145, 374); g.fill();
@@ -76,21 +99,15 @@ const SpoEnvironment = {
     b.scene.background = new T.Color(th.outdoor ? '#cbded9' : th.fog);
     const floor = this.floor(th, low ? 1024 : 1536);
     const floorMat = new T.MeshToonMaterial({ map: floor, gradientMap: c3().ramp, color: th.outdoor ? '#ffffff' : '#d5dce2' });
+    const inlayMat = new T.MeshBasicMaterial({ map: this.inlay(b.waveIdx || 0), color: th.outdoor ? '#739493' : '#a4bec0', transparent: true, opacity: .34, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
     const trim = toonMat(th.outdoor ? '#cbcbb6' : '#697986');
     const wall = toonMat(th.outdoor ? '#dce0ce' : '#536570');
     const treeMap = this.texture('painted-garden-tree.png');
     const leaf = new T.SpriteMaterial({ map: treeMap, transparent: true, depthWrite: false, color: th === ARENA_THEMES['sunset-street'] ? '#dfbcab' : '#ffffff' });
     const cafe = new T.SpriteMaterial({ map: this.texture('painted-cafe.png'), transparent: true, depthWrite: false, color: th.outdoor ? '#ffffff' : '#aeb9cb' });
-    const rooms = b.routeEnabled ? b.stage.waves.length : 1;
+    const rooms = 1;
     b.routeMarkers = [];
-    const markerTex = canvasTex('studio-path-marker', 128, 128, g => {
-      g.strokeStyle = '#eff8df'; g.lineWidth = 6;
-      g.beginPath(); g.arc(64, 64, 54, 0, Math.PI * 2); g.stroke();
-      g.fillStyle = '#c5e1b0'; g.beginPath(); g.moveTo(64, 24); g.lineTo(92, 64); g.lineTo(73, 64); g.lineTo(73, 100); g.lineTo(55, 100); g.lineTo(55, 64); g.lineTo(36, 64); g.closePath(); g.fill();
-    });
-    const markerMat = new T.MeshBasicMaterial({ map: markerTex, transparent: true, opacity: .7, depthWrite: false });
     const tile = geo('studio-field', () => new T.PlaneGeometry(30, 30).rotateX(-Math.PI / 2));
-    const path = geo('studio-path', () => new T.PlaneGeometry(8, 8).rotateX(-Math.PI / 2));
     const box = geo('studio-prop', () => new T.BoxGeometry(1, 1, 1));
     const put = (group, geometry, material, x, y, z, sx = 1, sy = 1, sz = 1) => {
       const m = new T.Mesh(geometry, material); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.receiveShadow = true; m.castShadow = !low; group.add(m); return m;
@@ -104,12 +121,13 @@ const SpoEnvironment = {
       g.globalAlpha = 1;
     });
     const landscape = new T.MeshBasicMaterial({ map: surround });
-    put(b.routeWorld, geo('studio-surround-plane', () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), landscape, 0, -.05, -(rooms - 1) * 17, 100, 1, rooms * 34 + 60);
+    put(b.routeWorld, geo('studio-surround-plane', () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), landscape, 0, -.05, 14, 100, 1, 58);
     const bed = geo('studio-garden-bed', () => new T.CylinderGeometry(1, 1.04, .5, 24));
     const soil = toonMat(th.outdoor ? '#7d9370' : '#4c5e63');
     for (let i = 0; i < rooms; i++) {
       const room = new T.Group(); room.position.z = -i * 34; b.routeWorld.add(room);
       put(room, tile, floorMat, 0, .001, 0);
+      put(room, tile, inlayMat, 0, .012, 0).castShadow = false;
       // Streets stay open along the route; planters and facades frame the playable space.
       for (const side of [-1, 1]) {
         put(room, box, trim, side * 14.8, .18, 0, .35, .35, 30);
@@ -134,12 +152,7 @@ const SpoEnvironment = {
           building.position.set(side * 19.4, 5, -6 + (i % 2) * 5); building.scale.set(12, 11, 1); room.add(building);
         }
       }
-      if (i < rooms - 1) {
-        put(room, path, floorMat, 0, .002, -17, 1, 1, 1);
-        for (const side of [-1, 1]) put(room, box, trim, side * 4.4, .3, -17, .25, .6, 8);
-        const marker = new T.Mesh(geo('studio-marker', () => new T.PlaneGeometry(3, 3).rotateX(-Math.PI / 2)), markerMat);
-        marker.position.set(0, .025, -12); marker.visible = false; room.add(marker); b.routeMarkers.push(marker);
-      }
+
     }
     // A painted panorama gives the 3D street the same art direction as the story.
     {
@@ -150,5 +163,61 @@ const SpoEnvironment = {
     }
     b.motes = new Sparks(b.scene, glowTex(), low ? 30 : 70);
     for (let i = 0; i < (low ? 12 : 36); i++) b.motes.emit(((i * 13) % 29) - 14, 1 + i % 5, ((i * 7) % 25) - 12, { n: 1, color: th.mote, speed: .08, grav: 0, drag: 0, life: 1e6, size: .04, bright: .55 });
+    if (!th.outdoor) leaf.dispose();
+    if (!th.outdoor && th !== ARENA_THEMES.alley) cafe.dispose();
+    this.buildGallery(b, th, low);
+    if (b.routeEnabled) SpoExpedition.build(b, th);
+  },
+  buildGallery(b, th, low) {
+    const T = THREE, group = new T.Group(); b.routeWorld.add(group);
+    const roof = th === ARENA_THEMES.rooftop, tunnel = th === ARENA_THEMES.tunnel;
+    const variant = (b.waveIdx || 0) % 3;
+    const stone = new T.MeshStandardMaterial({ map: SpoExpedition.wallTexture(), color: th.outdoor ? '#efecdb' : '#849cae', roughness: .95 });
+    const trim = new T.MeshStandardMaterial({ color: th.outdoor ? ['#64908e', '#859798', '#9b8d79'][variant] : '#3c6579', roughness: .8 });
+    const dark = new T.MeshStandardMaterial({ color: tunnel ? '#263745' : '#416e82', roughness: .45, metalness: .12 });
+    const light = new T.MeshBasicMaterial({ color: tunnel ? '#d1b788' : '#b8dbde' });
+    const box = geo('gallery-box', () => new T.BoxGeometry(1, 1, 1));
+    const arch = geo('gallery-arch', () => new T.TorusGeometry(1, .12, 6, 20, Math.PI));
+    const put = (g, m, x, y, z, sx, sy, sz) => {
+      const obj = new T.Mesh(g, m); obj.position.set(x, y, z); obj.scale.set(sx, sy, sz); obj.castShadow = !low; obj.receiveShadow = true; group.add(obj); return obj;
+    };
+    // Open colonnades surround the playable court without putting walls through its camera.
+    for (const side of [-1, 1]) {
+      const x = side * 13.9;
+      put(box, trim, x, .25, 0, .6, .5, 34);
+      for (let i = 0; i < (low ? 4 : 6); i++) {
+        const z = -14 + i * (low ? 9 : 5.6), height = roof ? 2.8 : 5.2;
+        put(box, stone, x, height / 2, z, .75, height, .8);
+        put(box, trim, x, .6, z, 1.15, .22, 1.2);
+        put(box, trim, x, height - .15, z, 1.05, .24, 1.2);
+        if (!roof && i < (low ? 3 : 5)) {
+          const span = low ? 9 : 5.6;
+          const a = put(arch, stone, x, 3.65, z + span / 2, span / 2, 1.7, 1.3); a.rotation.y = Math.PI / 2;
+          put(box, trim, x, 5.65, z + span / 2, 1.1, .3, span + .4);
+        }
+        if (i % 2 === 0) {
+          put(box, dark, x - side * .5, 2.45, z, .48, .85, .58);
+          put(box, light, x - side * .77, 2.45, z, .05, .5, .34);
+        }
+      }
+      if (roof) {
+        put(box, dark, x - side * .7, 1.25, -8, 1.7, 2.5, 4);
+        put(box, trim, x - side * .7, 2.6, -8, 2, .2, 4.3);
+      }
+    }
+    // A raised gallery at the far edge establishes a destination beyond the fighting space.
+    for (const side of [-1, 1]) {
+      const x = side * 10;
+      put(box, stone, x, 1, -14.2, 13, 2, 3.3);
+      put(box, trim, x, 2.1, -14.2, 13.4, .18, 3.5);
+      for (let k = 0; k < 3; k++) {
+        const px = x + (k - 1) * 4;
+        put(box, stone, px, 4.3, -14.8, .7, 4.3, .8);
+        put(box, trim, px, 6.5, -14.8, 1.1, .22, 1.2);
+        if (!low) { put(box, dark, px + 1.7, 3.5, -15.2, 2, 2.8, .24); put(box, light, px + 1.7, 4.2, -15.03, 1.3, .07, .04); }
+      }
+      put(box, trim, x, 6.7, -14.8, 13.5, .3, 2.4);
+    }
+
   },
 };
