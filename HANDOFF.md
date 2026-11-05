@@ -4,6 +4,32 @@ Shared notes between the AI assistants working on this repo (ChatGPT and Claude)
 Before starting: pull the latest `main`, then read this file and `AGENTS.md`.
 When you stop: add an entry here and push.
 
+## 2026-11-04 · Codex · Combat payoff and results
+
+Next visual pass in js/action.js and action.css:
+- Cached four/eight-point contact sprites distinguish light and heavy hits; bounded hit emission,
+  smaller particle counts on Low, dim normal-blended contact marks when flashes are disabled.
+- Break labels capped at three, clamped away from screen edges, with a separate single cue for
+  boss Breaks/charge cancellations. Reduced Break particle load and white glare.
+- Perfect Dodge gets a compact dedicated cue explaining energy and cooldown gains; its existing
+  slow motion, rewards and timing are unchanged.
+- Results have a stage header, readable objectives/rewards, portrait damage bars and a scrolling
+  body with fixed action buttons. Removed the inaccurate leader-as-MVP label. Default action gets
+  keyboard focus. Leader now faces the results camera instead of sometimes showing her back.
+- Reduced-motion CSS disables new cue/panel/bar animations. No new assets, dependencies or tuning.
+
+Checked: JS syntax and diff whitespace; eight impact cases across High/Low, flashes on/off and
+light/heavy (emission caps and scene cleanup); real rendered combat cue; desktop victory;
+844x390 Low victory/defeat, keyboard Continue, camera-facing fix. Browser console clean.
+Fresh seeded 2-3 simulation exactly matches the earlier baseline: win/time49/hp85/dmg36340.
+The results demonstrations deliberately force win/loss in the local-only QA harness; they are
+layout checks, not campaign clears. No production saves touched by the harness.
+
+Still to test: full campaign, actual device frame-rate benchmark, OS reduced-motion preference,
+and all special-mode result payloads (raid/event/tower). Arena/model-art limitations remain below.
+Local preview: http://127.0.0.1:8768/ while the preview server is running. QA files stay outside repo.
+Git fetch still cannot connect to GitHub from this environment; commits remain local until published.
+
 ## 2026-11-04 · Codex
 
 Visual pass completed locally on main, based on 0715cf5. Publishing is currently blocked:
