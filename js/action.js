@@ -301,7 +301,7 @@ class Streaks {
   }
   // o: n, speed, color, bright, width, life, grav, drag, dir {x,y,z} + spread, up
   emit(x, y, z, o = {}) {
-    const n = o.n || 10, c = this.tmp.set(o.color || '#ffffff'), br = o.bright || 2;
+    const n = Math.min(o.n || 10, SAVE.settings.gfx === 'low' ? 6 : 20), c = this.tmp.set(o.color || '#ffffff'), br = Math.min(o.bright || 1.3, SAVE.settings.flashes === false ? .8 : 1.6);
     for (let i = 0; i < n; i++) {
       if (this.n >= this.max) return;
       const k = this.n++, k3 = k * 3;
@@ -373,7 +373,7 @@ class Sparks {
   }
   // o: n, speed, color, bright, size, life, grav, drag, up (bias upward), dir {x,z} + spread, jitter, grow
   emit(x, y, z, o = {}) {
-    const n = o.n || 10, c = this.tmp.set(o.color || '#ffffff'), br = o.bright || 1.6;
+    const n = Math.min(o.n || 10, SAVE.settings.gfx === 'low' ? 7 : 22), c = this.tmp.set(o.color || '#ffffff'), br = Math.min(o.bright || 1.1, SAVE.settings.flashes === false ? .7 : 1.4);
     for (let i = 0; i < n; i++) {
       if (this.n >= this.max) return;
       const k = this.n++, k3 = k * 3;
@@ -470,8 +470,8 @@ class ActionFx {
     }
   }
   basic(color, o = {}) {
-    return new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(o.bright || 1.8), map: o.map || null, transparent: true,
-      opacity: o.opacity == null ? 1 : o.opacity, depthWrite: false, blending: o.normal ? THREE.NormalBlending : THREE.AdditiveBlending, side: THREE.DoubleSide });
+    return new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(Math.min(o.bright || 1.2, SAVE.settings.flashes === false ? .85 : 1.6)), map: o.map || null, transparent: true,
+      opacity: o.opacity == null ? 1 : o.opacity, depthWrite: false, blending: o.normal || SAVE.settings.flashes === false ? THREE.NormalBlending : THREE.AdditiveBlending, side: THREE.DoubleSide });
   }
   flatRing(x, z, color, r0, r1, dur, o = {}) {
     const m = new THREE.Mesh(geo('fxRing', () => new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2)), this.basic(color, { map: ringTex(), bright: o.bright || 2.2 }));
@@ -507,12 +507,13 @@ class ActionFx {
     this.nova(x, z, r, color);
   }
   splat(x, z, r, color) {
+    if (color === '#ff5a5a') color = '#cf91b2';
     const m = new THREE.Mesh(geo('fxSplat', () => new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2)),
       new THREE.MeshBasicMaterial({ color, map: splatTex(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }));
     m.position.set(x, 0.03, z);
     m.rotation.y = Math.random() * 6.28;
     // Kept translucent and short-lived so splats don't bury the red warning zones.
-    this.add(m, 2.6, k => { const s = r * Math.min(1, 0.4 + k * 12); m.scale.set(s, 1, s); m.material.opacity = k < 0.7 ? 0.6 : 0.6 * (1 - (k - 0.7) / 0.3); }, () => m.material.dispose());
+    this.add(m, 1.6, k => { const s = r * Math.min(1, 0.4 + k * 12); m.scale.set(s, 1, s); m.material.opacity = k < 0.6 ? 0.28 : 0.28 * (1 - (k - 0.6) / 0.4); }, () => m.material.dispose());
     this.b.sparks.emit(x, 0.4, z, { n: 22, speed: r * 3, color, up: 1.2, life: 0.6, size: 0.24, grav: 12, bright: 1.2 });
     this.glow(x, 0.5, z, color, r * 1.2, 0.25);
   }
@@ -667,6 +668,7 @@ class ActionBattle {
   constructor(container, stage, team, onExit, opts = {}) {
     this.stage = stage; this.onExit = onExit; this.opts = opts;
     this.headless = !!opts.headless;
+    this.plan = !opts.run && SpoDesign.allowedFor(stage) ? SpoDesign.plan(opts.plan || 'balanced') : SpoDesign.plans.balanced;
     this.run = opts.run || null;                 // roguelite run state (rift.js)
     this.perks = (this.run && this.run.perks) || {};
     this.mods = new Set(stage.mods || []);
@@ -677,10 +679,13 @@ class ActionBattle {
     this.stat = { hits: 0, crits: 0, breaks: 0, kills: 0, ults: 0, perfect: 0, maxCombo: 0, taken: 0 };
     this.auto = this.headless || (!stage.tutorial && BATTLE_PREFS.auto);
     this.keys = {}; this.stick = { x: 0, z: 0, on: false };
+    this.routeEnabled = !this.headless && !stage.raid && !stage.tower && !stage.hub && !opts.run && stage.waves.length > 1;
+    this.routeTime = 0; this.routeWalking = false;
     this.waveIdx = 0; this.waveClear = false; this.sndAt = {};
     this.raidTime = stage.raid ? RAID_TIME : 0;
     this.root = document.createElement('div');
     this.root.className = 'ab';
+    this.root.dataset.connectedAreas = String(this.routeEnabled);
     if (!this.headless) container.replaceChildren(this.root);
     this.buildDom();
     this.initScene();
@@ -703,7 +708,7 @@ class ActionBattle {
   }
 
   // Seconds of actual fighting (the story scene before it doesn't count).
-  fightTime() { return Math.max(0, (this.over ? this.endTime : this.time) - this.t0); }
+  fightTime() { return Math.max(0, (this.combatEnd == null ? (this.over ? this.endTime : this.time) : this.combatEnd) - this.t0 - this.routeTime); }
 
   // ---------- story scenes in the arena ----------
   // Lines for the scene before ('start') or after ('end') the fight. Story stages
@@ -741,20 +746,14 @@ class ActionBattle {
   }
 
   startIntro(lines) {
-    this.phase = 'scene';
-    this.root.classList.add('scene');
-    const cast = this.sceneCast(lines);
-    cast.forEach((u, i) => {
-      const m = SCENE_MARKS[Math.min(i, SCENE_MARKS.length - 1)];
-      u.pos.set(m[0], 0, m[1] + 5.5);
-      u.walkTo = new THREE.Vector3(m[0], 0, m[1]);
-      u.facing = Math.PI;
-      this.syncModel(u);
-    });
-    this.camAt.set(0, 0, 8.5);
-    this.camFocus = new THREE.Vector3(0, 0, 4);
-    this.after(0.7, () => { if (this.phase === 'scene') this.cam.to = { yaw: Math.PI * 0.94, dist: 6.6, h: 2.5 }; });
-    this.after(1.25, () => (lines.length ? this.playScene(lines, () => this.beginFight()) : this.beginFight()));
+    this.phase = 'scene'; this.root.classList.add('scene'); this.sceneActors = [];
+    this.player.model.root.visible = false; this.player.shadow.visible = false;
+    this.camAt.set(0, 0, 1); this.camFocus = new THREE.Vector3(0, 0, 0);
+    this.cam.to = { yaw: .12, dist: 13, h: 8 };
+    this.after(.2, () => this.playScene(lines, () => {
+      if (!this.sceneQuick) SAVE.seen[this.stage.id + ':field-start'] = true;
+      this.beginFight();
+    }));
   }
 
   beginFight() {
@@ -763,6 +762,7 @@ class ActionBattle {
     if (!this.headless) {
       if (this.sceneActors.length && !this.sceneQuick) SAVE.seen[this.stage.id + ':field-start'] = true;
       this.root.classList.remove('scene');
+      this.player.model.root.visible = true; this.player.shadow.visible = true;
       this.q('.ab-scene').classList.add('hidden');
       this.cam.to = battleCam();
       this.camFocus = null;
@@ -783,31 +783,17 @@ class ActionBattle {
     if (this.over) return;
     const lines = this.headless ? null : this.sceneLines('end');
     if (!lines || !lines.length) return this.finish(true);
-    this.phase = 'scene';
-    this.root.classList.add('scene');
+    this.phase = 'scene'; this.root.classList.add('scene');
     this.zones.forEach(z => this.removeZone(z)); this.zones = [];
     this.projectiles.forEach(p => { if (p.mesh) this.scene.remove(p.mesh); }); this.projectiles = [];
-    const h = this.player;
-    h.atk_ = null; h.dodgeTime = 0;
-    const cast = this.sceneCast(lines);
-    cast.forEach((u, i) => {
-      if (u === h) return;
-      const a = Math.PI + (i % 2 ? 1 : -1) * (0.7 + Math.floor((i - 1) / 2) * 0.55), d = 1.6 + Math.floor((i - 1) / 2) * 0.5;
-      u.pos.set(h.pos.x + Math.sin(a) * d, 0, h.pos.z + Math.cos(a) * d);
-      this.keepInArena(u);
-      u.facing = Math.PI;
-      this.syncModel(u);
-      if (!u.npc) u.on = 0;
-      this.fx.pillar(u.pos.x, u.pos.z, u.def.color, 0.5, 0.6);
-      this.stars.emit(u.pos.x, 0.8, u.pos.z, { n: 8, speed: 2, color: u.def.color, life: 0.6, size: 0.4, grav: -1 });
-    });
-    this.camFocus = h.pos.clone();
-    this.cam.to = { yaw: Math.PI * 0.94, dist: 6.2, h: 2.4 };
-    cast.forEach((u, i) => this.after(0.1 * i, () => u.model.play('cheer')));
-    this.after(0.7, () => this.playScene(lines, () => {
+    this.player.atk_ = null; this.player.dodgeTime = 0;
+    this.player.model.root.visible = false; this.player.shadow.visible = false;
+    this.supports.forEach(u => { if (u.model?.root) u.model.root.visible = false; if (u.shadow) u.shadow.visible = false; });
+    this.sceneActors = []; this.camFocus = new THREE.Vector3(0, 0, 0); this.cam.to = { yaw: .12, dist: 13, h: 8 };
+    this.playScene(lines, () => {
       if (!this.sceneQuick) SAVE.seen[this.stage.id + ':field-end'] = true;
       this.finish(true);
-    }));
+    });
   }
 
   // A member vanishes in a burst of sparkles (remove = an NPC leaving for good).
@@ -841,6 +827,9 @@ class ActionBattle {
     this.sceneLine = { text, shown: 0, wait: 0, talkT: 0, chat: who === 'chat' };
     box.className = 'abs-box' + (who === 'narrator' ? ' narr' : '') + (who === 'chat' ? ' chat' : '');
     const c = CHARACTERS[who];
+    const portrait = this.q('.abs-portrait');
+    portrait.classList.toggle('hidden', !c);
+    if (c) { portrait.src = ART[who].url; portrait.alt = c.name; }
     box.style.setProperty('--c', c ? c.color : who === 'chat' ? '#ff5c9a' : '#cfd5ff');
     this.q('.abs-name').textContent = c ? c.short : who === 'chat' ? 'LIVE CHAT' : who === 'narrator' ? '' : (name || (ENEMIES[who] ? ENEMIES[who].name : who));
     this.q('.abs-text').textContent = '';
@@ -926,10 +915,10 @@ class ActionBattle {
       <div class="ab-labels"></div>
       <div class="ab-tint"></div>
       <div class="ab-top">
-        <div class="ab-stage"><span class="live"><i></i>LIVE</span><b>${st.raid ? 'RANKED RAID' : st.run ? 'BRACKET RUN' : st.tower ? 'TOWER' : st.id}</b><span class="ab-name">${st.name}</span><em class="ab-wave"></em></div>
-        <div class="ab-ctrl"><button class="ctl auto ${this.auto ? 'on' : ''}" title="Auto battle (F)">${ic('auto')}<span>AUTO</span></button><button class="ctl pause" title="Pause (Esc)">${ic('pause')}</button></div>
+        <div class="ab-stage"><span class="live"><i></i>LIVE</span><b>${st.raid ? 'RANKED RAID' : st.run ? 'BRACKET RUN' : st.tower ? 'TOWER' : st.id}</b><span class="ab-name">${st.name}</span><em class="ab-wave"></em><small class="ab-plan">${this.plan.name}</small></div>
+        <div class="ab-ctrl"><button class="ctl auto ${this.auto ? 'on' : ''}" aria-pressed="${this.auto}" title="Auto battle (F)">${ic('auto')}<span>AUTO</span></button><button class="ctl pause" title="Pause (Esc)">${ic('pause')}</button></div>
       </div>
-      <div class="ab-clock"><b>0:00</b><small></small></div>
+      <div class="ab-clock" title="Combat time · travel does not count"><b>0:00</b><small></small></div>
       <div class="ab-boss hidden"><div class="abb-head"><b class="abb-name"></b><span class="abb-weak"></span><span class="abb-phase"></span></div>
         <div class="abb-hp"><i class="abb-trail"></i><i class="abb-fill"></i><u style="left:50%"></u><u style="left:25%"></u></div><div class="abb-poise"><i></i></div><div class="abb-cast"></div></div>
       ${st.raid ? '<div class="ab-raid"><small>RAID SCORE</small><b>0</b></div>' : ''}
@@ -949,14 +938,14 @@ class ActionBattle {
         ${this.team.slice(1).map((id, i) => `<button class="ab-b sup" data-k="sup${i}" style="--c:${CHARACTERS[id].color}"><span class="abb-cd"></span><span class="abb-face" style="${faceStyle(id)}"></span><kbd>${i + 1}</kbd><small class="abb-t"></small></button>`).join('')}
       </div>
       <div class="ab-cut hidden"></div>
-      <div class="ab-scene hidden"><i class="abs-bar top"></i><i class="abs-bar bot"></i><div class="abs-chat"></div>
+      <div class="ab-scene hidden"><img class="abs-portrait hidden" alt=""><i class="abs-bar top"></i><i class="abs-bar bot"></i><div class="abs-chat"></div>
         <div class="abs-ctrl"><button class="abs-auto">AUTO</button><button class="abs-skip">SKIP ›</button></div>
         <div class="abs-box"><span class="abs-face"></span><div class="abs-name"></div><p class="abs-text"></p><i class="abs-next"></i></div></div>
       <div class="ab-coach hidden"><p></p></div>
       <div class="ab-flash"></div>
       <div class="pause-menu hidden"></div>
       <div class="end hidden"></div>`;
-    if (n > 1) this.q('.ab-wave').textContent = `WAVE 1/${n}`;
+    if (n > 1) this.q('.ab-wave').textContent = `${this.routeEnabled ? 'AREA' : 'WAVE'} 1/${n}`;
   }
 
   initScene() {
@@ -1009,7 +998,7 @@ class ActionBattle {
       // and every outline comes out jagged.
       this.composer = new X.EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
       this.composer.addPass(new X.RenderPass(this.scene, this.camera));
-      this.bloom = new X.UnrealBloomPass(new THREE.Vector2(512, 512), 0.55, 0.32, 1.0);
+      this.bloom = new X.UnrealBloomPass(new THREE.Vector2(512, 512), 0.24, 0.25, 1.25);
       this.composer.addPass(this.bloom);
       // Gentle vignette and a touch more saturation: the anime-game finish.
       this.grade = new X.ShaderPass({
@@ -1033,13 +1022,15 @@ class ActionBattle {
     if (this.composer) this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     // Narrow screens pull the camera back so the arena still fits.
-    this.baseFov = this.camera.fov = w / h < 1.4 ? 44 : 36;
+    this.baseFov = this.camera.fov = w / h < 1.4 ? 48 : 42;
     this.camera.updateProjectionMatrix();
     const ph = this.renderer.getPixelRatio() * h;
     [this.sparks, this.stars].forEach(s => { if (s.mat) s.mat.uniforms.scale.value = ph / (2 * Math.tan(this.camera.fov * Math.PI / 360)); });
   }
 
-  buildArena(th) {
+  buildArena(th) { SpoEnvironment.build(this, th); }
+
+  buildHallArena(th) {
     const s = this.scene, R = ACT.arena;
     // Sky dome with a vertical gradient.
     const sky = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 16), new THREE.ShaderMaterial({
@@ -1312,7 +1303,7 @@ class ActionBattle {
     let hp = b.hp, atk = b.atk, df = b.def_;
     this.team.slice(1).forEach(sid => { const s = charStats(sid); hp += s.hp * share; atk += s.atk * share; df += s.def * share; });
     const P = this.perks;
-    hp *= 1 + (P.hp || 0); atk *= 1 + (P.atk || 0);
+    hp *= (1 + (P.hp || 0)) * this.plan.hp; atk *= (1 + (P.atk || 0)) * this.plan.atk;
     const u = Object.assign(b, { kind: 'hero', side: 'ally', kit: ACTION_KITS[id], pos: new THREE.Vector3(0, 0, 4), facing: Math.PI, r: 0.4,
       maxHp: Math.round(hp), atk: Math.round(atk), def_: Math.round(df), crit: b.crit + (P.crit || 0), critDmg: b.critDmg + (P.critDmg || 0),
       energy: 0, skillCd: 1.5, dodge: ACT.dodgeCharges + (P.dodge || 0), dodgeT: 0, iframes: 0, dodgeTime: 0, perfectWin: 0, perfectUsed: false,
@@ -1328,7 +1319,7 @@ class ActionBattle {
   makeSupport(id) {
     const b = this.baseStats(id), k = ACTION_KITS[id];
     return Object.assign(b, { kind: 'support', side: 'ally', kit: k, pos: new THREE.Vector3(), facing: Math.PI, r: 0.4, cd: 3 + Math.random() * 2, model: this.headless ? NOOP : null,
-      cdMax: k.support.cd * (1 - (this.perks.supCdr || 0)) * (this.mods.has('hype') ? 0.5 : 1), on: 0, dmg: 0, alive: true, statuses: [] });
+      cdMax: k.support.cd * this.plan.support * (1 - (this.perks.supCdr || 0)) * (this.mods.has('hype') ? 0.5 : 1), on: 0, dmg: 0, alive: true, statuses: [] });
   }
 
   // ms = model scale: members and small foes are drawn a little larger than their hit circles.
@@ -1430,7 +1421,7 @@ class ActionBattle {
     });
     const n = this.stage.waves.length;
     if (!this.headless) {
-      this.q('.ab-wave').textContent = n > 1 ? `WAVE ${this.waveIdx + 1}/${n}` : '';
+      this.q('.ab-wave').textContent = n > 1 ? `${this.routeEnabled ? 'AREA' : 'WAVE'} ${this.waveIdx + 1}/${n}` : '';
       const boss = this.foes.find(f => f.boss && f.alive);
       this.bossUnit = boss || null;
       this.q('.ab-boss').classList.toggle('hidden', !boss);
@@ -1439,7 +1430,7 @@ class ActionBattle {
         this.q('.abb-weak').innerHTML = `<small>WEAK</small>${(boss.def.weak || []).map(w => elIc(w)).join('')}`;
         this.banner(`BOSS · ${boss.name}`, 'boss');
         sfx('phase');
-      } else if (this.waveIdx > 0) this.banner(`WAVE ${this.waveIdx + 1}`, 'wave');
+      } else if (this.waveIdx > 0) this.banner(`${this.routeEnabled ? 'AREA' : 'WAVE'} ${this.waveIdx + 1}`, 'wave');
     } else this.bossUnit = this.foes.find(f => f.boss && f.alive) || null;
     this.waveClear = false;
   }
@@ -1453,6 +1444,7 @@ class ActionBattle {
       const k = e.key.toLowerCase();
       if (k === 'escape') { this.paused ? this.resume() : this.pause(); return; }
       if (this.paused) return;
+      if (this.phase === 'route' && [' ', 'enter'].includes(k)) { e.preventDefault(); this.setRouteWalking(true); return; }
       if (this.phase === 'scene') { if ([' ', 'enter', 'e', 'j'].includes(k)) { e.preventDefault(); if (!e.repeat) this.advance(); } return; }
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { this.keys[k] = true; e.preventDefault(); }
       if (e.repeat) return;
@@ -1509,6 +1501,8 @@ class ActionBattle {
   toggleAuto() {
     this.auto = BATTLE_PREFS.auto = !this.auto; saveBattlePrefs();
     this.q('.auto').classList.toggle('on', this.auto);
+    this.q('.auto').setAttribute('aria-pressed', String(this.auto));
+    if (this.phase === 'route') this.setRouteWalking(this.auto);
   }
 
   moveInput() {
@@ -1545,6 +1539,7 @@ class ActionBattle {
       const ev = this.events[i];
       if (ev.at <= this.time) { this.events.splice(i, 1); i--; if (!this.disposed) ev.fn(); }
     }
+    if (this.phase === 'route') { this.updateRoute(dt); return; }
     if (this.phase === 'scene') {
       this.updateScene(dt);
       this.foes.slice().forEach(e => { if (e.dying) this.updateFoe(e, dt); });
@@ -1587,7 +1582,7 @@ class ActionBattle {
       }
     }
     if (this.clouds) this.clouds.rotation.y += raw * 0.012;
-    if (this.bloom && this.bloom.strength > 0.55) this.bloom.strength = Math.max(0.55, this.bloom.strength - raw * 0.45);
+    if (this.bloom && this.bloom.strength > 0.24) this.bloom.strength = Math.max(0.24, this.bloom.strength - raw * 0.45);
     // Ring under the leader; the reticle sits under whatever she is attacking.
     const h = this.player;
     if (this.heroRing) {
@@ -1635,6 +1630,7 @@ class ActionBattle {
     }
     let tx, tz;
     if (this.camFocus) { tx = this.camFocus.x; tz = this.camFocus.z; }
+    else if (this.phase === 'route') { tx = h.pos.x; tz = h.pos.z - 1; }
     else {
       // Lead the camera a little toward the nearest enemies so you see what is coming.
       const t = this.over ? null : this.nearestFoe(h.pos, 12), look = this.camLook;
@@ -1680,7 +1676,15 @@ class ActionBattle {
     if (h.mem && h.mem.type === 'regen') { h.regenT = (h.regenT || 0) + dt; if (h.regenT >= 6) { h.regenT = 0; this.healHero(h.maxHp * h.mem.v / 100, h, true); } }
     const mv = this.auto ? this.autoMove() : this.moveInput();
     if (this.auto && !this.want) this.want = this.autoAct();
-    if (this.want) { const w = this.want; this.want = null; this.doAction(w, mv); }
+    if (this.want) {
+      const w = this.want; this.want = null;
+      if (!this.auto && ['skill', 'ult'].includes(w) && h.busy > 0 && h.busy < .22) this.queuedAction = { key: w, until: this.time + .22 };
+      else this.doAction(w, mv);
+    }
+    if (this.queuedAction) {
+      if (this.time > this.queuedAction.until) this.queuedAction = null;
+      else if (h.busy <= 0 && h.dodgeTime <= 0) { const key = this.queuedAction.key; this.queuedAction = null; this.doAction(key, mv); }
+    }
     if (h.dodgeTime > 0) {
       h.dodgeTime -= dt;
       h.pos.addScaledVector(h.dodgeVel, dt);
@@ -1714,6 +1718,7 @@ class ActionBattle {
 
   doAction(w, mv) {
     const h = this.player;
+    if (this.phase !== 'fight') return;
     if (w === 'dodge') return this.tryDodge(mv);
     if (w === 'skill') return this.useSkill();
     if (w === 'ult') return this.useUlt();
@@ -2097,9 +2102,9 @@ class ActionBattle {
     };
     loop();
     if (!this.headless) {
-      const m = new THREE.Mesh(geo('fxSplat', () => new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2)), new THREE.MeshBasicMaterial({ color, map: splatTex(), transparent: true, depthWrite: false, opacity: 0.5 }));
+      const m = new THREE.Mesh(geo('fxSplat', () => new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2)), new THREE.MeshBasicMaterial({ color: color === '#ff5a5a' ? '#cf91b2' : color, map: splatTex(), transparent: true, depthWrite: false, opacity: 0.2 }));
       m.position.set(x, 0.025, z); m.scale.set(r, 1, r);
-      this.fx.add(m, dur, k => { m.material.opacity = 0.5 * (k < 0.85 ? 1 : (1 - k) / 0.15); }, () => m.material.dispose());
+      this.fx.add(m, dur, k => { m.material.opacity = 0.2 * (k < 0.85 ? 1 : (1 - k) / 0.15); }, () => m.material.dispose());
     }
   }
 
@@ -2881,14 +2886,73 @@ class ActionBattle {
   }
 
   // ---------- wave flow & end ----------
+  beginRoute() {
+    if (this.over || this.disposed || this.phase !== 'fight') return;
+    this.phase = 'route'; this.routeWalking = this.auto;
+    this.player.atk_ = null; this.player.busy = 0; this.player.dodgeTime = 0;
+    this.supports.forEach(s => { s.on = 0; if (s.model?.root) s.model.root.visible = false; if (s.shadow) s.shadow.visible = false; });
+    this.zones.forEach(z => this.removeZone(z)); this.zones = [];
+    this.projectiles.forEach(p => { if (p.mesh) this.scene.remove(p.mesh); }); this.projectiles = [];
+    this.camFocus = null; this.cam.to = battleCam();
+    this.root.classList.add('travelling');
+    const go = document.createElement('button'); go.className = 'ab-route';
+    go.innerHTML = `<span>Continue to area ${this.waveIdx + 2}<small>Explore with WASD / stick · Enter for assisted walking</small></span>${ic('next')}`;
+    go.onclick = () => this.setRouteWalking(!this.routeWalking);
+    this.root.appendChild(go);
+    this.routeButton = go; this.setRouteWalking(this.auto);
+    if (this.routeMarkers) this.routeMarkers[this.waveIdx].visible = true;
+  }
+
+  setRouteWalking(on) {
+    this.routeWalking = on;
+    if (!this.routeButton) return;
+    this.routeButton.classList.toggle('walking', on);
+    this.routeButton.querySelector('span').firstChild.nodeValue = on ? 'Stop assisted walking' : `Continue to area ${this.waveIdx + 2}`;
+  }
+
+  updateRoute(dt) {
+    this.routeTime += dt;
+    const h = this.player, input = this.moveInput();
+    let dx = input ? input.x : 0, dz = input ? input.z : 0;
+    if (!input && this.routeWalking) {
+      dx = -h.pos.x; dz = -30 - h.pos.z;
+      const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
+    }
+    const moving = Math.hypot(dx, dz) > .05;
+    if (moving) {
+      h.pos.x += dx * ACT.speed * dt; h.pos.z += dz * ACT.speed * dt;
+      // The passage between courtyards is narrow; movement within each area stays free.
+      const halfWidth = h.pos.z < -14.5 && h.pos.z > -19.5 ? 3.4 : 14;
+      h.pos.x = Math.max(-halfWidth, Math.min(halfWidth, h.pos.x));
+      h.pos.z = Math.max(-31, Math.min(14, h.pos.z));
+      h.facing = turnTo(h.facing, Math.atan2(dx, dz), dt * 12); h.model.setState('run');
+    } else h.model.setState('idle');
+    this.updatePickups(dt);
+    if (h.pos.z > -27 || Math.abs(h.pos.x) > 6) return;
+    // Rebase the world together with the camera: collision and skill maths stay local.
+    this.routeWorld.position.z += 34;
+    if (this.paintedPanorama) this.paintedPanorama.position.z += 34;
+    h.pos.z += 34; h.vel.set(0, 0, 0);
+    this.camAt.z += 34; this.camera.position.z += 34;
+    this.foes.forEach(e => { if (e.model) { this.scene.remove(e.model.root); e.model.dispose(); } if (e.shadow) this.scene.remove(e.shadow); if (e.bar) e.bar.remove(); });
+    this.foes = [];
+    this.pickups.forEach(p => { if (p.mesh) this.scene.remove(p.mesh); }); this.pickups = [];
+    this.root.querySelector('.ab-route')?.remove(); this.root.classList.remove('travelling');
+    this.routeButton = null;
+    if (this.routeMarkers) this.routeMarkers[this.waveIdx].visible = false;
+    this.want = null; this.queuedAction = null; this.waveIdx++; this.phase = 'fight'; this.spawnWave();
+  }
+
   checkWave() {
     if (this.waveClear || this.over) return;
     if (this.foes.some(f => f.alive)) return;
     this.waveClear = true;
     if (this.waveIdx < this.stage.waves.length - 1) {
+      if (this.routeEnabled) { this.after(0.6, () => { if (!this.over) this.beginRoute(); }); return; }
       this.after(0.6, () => { if (this.over) return; this.waveIdx++; this.spawnWave(); });
       return;
     }
+    this.combatEnd = this.time;
     if (this.stage.raid) return this.finish(true);
     if (this.headless) return this.finish(true);
     this.slow(0.25, 1);
@@ -2906,6 +2970,7 @@ class ActionBattle {
     if (this.opts.onFinish) return this.opts.onFinish(this, win);
     if (this.headless) return;
     h.model.setState(win ? 'win' : 'ko');
+    h.model.root.visible = false; if (h.shadow) h.shadow.visible = false;
     // Swing round in front of the leader and keep her on the left; results go on the right.
     this.camFocus = new THREE.Vector3(h.pos.x - 1.3, 0, h.pos.z);
     this.cam.to = { yaw: Math.PI * 0.92, dist: 4.4, h: 1.8 };
@@ -2918,8 +2983,10 @@ class ActionBattle {
   }
 
   showResults(win) {
-    if (this.disposed) return;
+    if (this.disposed || this.resultsShown) return;
+    this.resultsShown = true;
     const st = this.stage, h = this.player, secs = Math.round(this.fightTime());
+    const earnedPlan = win && !SAVE.cleared[st.id] ? Object.values(SpoDesign.plans).find(p => p.unlock === st.id) : null;
     SAVE.stats.battles++;
     SAVE.stats.bestCombo = Math.max(SAVE.stats.bestCombo, this.stat.maxCombo);
     if (win) { bumpDaily('wins'); SAVE.stats.wins++; }
@@ -2963,13 +3030,18 @@ class ActionBattle {
         ${ranks ? `<div class="rank-up">RANK UP! Rank ${SAVE.player.rank} · ${amt('gem', ranks * RANK_UP_GEMS)}</div>` : ''}`;
     }
     if (!win && !st.raid) rewardHtml = `<div class="tips"><b>How to win next time</b>${this.defeatTips().map(t => `<p>${t}</p>`).join('')}</div>`;
+    if (earnedPlan) rewardHtml += `<div class="studio-unlock"><small>NEW SQUAD TACTIC</small><b>${earnedPlan.name}</b><span>${earnedPlan.desc}</span><span>Choose this plan in Squad before your next battle.</span></div>`;
     if (bondUps.length) rewardHtml += `<div class="bond-up">${bondUps.map(b => `${ic('heart')} ${CHARACTERS[b.id].short} bond Lv ${b.lvl}!`).join(' · ')}</div>`;
     persist();
     const units = [h, ...this.supports], top = Math.max(1, ...units.map(u => u.dmg || 0));
+    const mvp = win ? units.reduce((best, u) => (u.dmg || 0) > (best.dmg || 0) ? u : best, h) : h;
     const end = this.q('.end');
     end.classList.add('ab-end');
+    const resultBg = st.bg || stageBg(st);
+    if (BACKGROUNDS[resultBg]) end.style.backgroundImage = `linear-gradient(90deg,#f5f8ea55,#f5f8eabf),${SpoEnvironment.storyStyle(resultBg).split(';')[0].replace('background-image:', '')}`;
     end.innerHTML = `
-      <div class="abe-quote" style="--c:${h.def.color}"><em>${win ? 'LEADER · ' : ''}${h.def.short}</em>${voice(h.id, win ? 'victory' : 'ko')}</div>
+      <img class="abe-illustration" src="${ART[mvp.id].url}" alt="${mvp.def.name}">
+      <div class="abe-quote" style="--c:${mvp.def.color}"><em>${win ? 'MVP · ' : ''}${mvp.def.short}</em>${voice(mvp.id, win ? 'victory' : 'ko')}</div>
       <div class="end-box ${win ? 'win' : 'lose'}" role="dialog" aria-modal="true" aria-labelledby="abe-title">
         <div class="abe-kicker">${st.raid ? 'RANKED RAID' : win ? 'STREAM COMPLETE' : 'STREAM ENDED'}<span>${st.id || ''}</span></div>
         <h1 id="abe-title">${st.raid ? 'RAID OVER' : win ? 'VICTORY' : 'DEFEAT'}</h1>
@@ -3011,6 +3083,7 @@ class ActionBattle {
 
   dispose() {
     this.disposed = true; this.over = true;
+    clearTimeout(this.cutTimer);
     cancelAnimationFrame(this.raf);
     if (this.unbind) this.unbind();
     if (this.onResize) window.removeEventListener('resize', this.onResize);
@@ -3090,6 +3163,7 @@ class ActionBattle {
     const blocked = this.hasStatus(h, 'silence') || !h.alive;
     const ult = this.q('.ab-b.ult');
     ult.style.setProperty('--e', (h.energy / 100 * 360) + 'deg');
+    ult.style.setProperty('--charge', Math.min(100, h.energy) + '%');
     ult.classList.toggle('ready', h.energy >= 100 && !blocked);
     const energy = Math.min(100, Math.max(0, Math.floor(h.energy)));
     if (force || this.hudEnergy !== energy || this.hudBlocked !== blocked) {
@@ -3195,7 +3269,10 @@ class ActionBattle {
       e.bar.classList.toggle('broken', e.broken);
       e.bar.classList.toggle('show', e.hp < e.maxHp || e.broken);
       const sk = e.statuses.map(s => s.label).join(' ');
-      if (e.barSt !== sk) { e.barSt = sk; e.bar.querySelector('.abl-st').innerHTML = e.statuses.map(s => `<span class="${s.key}">${s.label}</span>`).join(''); }
+      if (e.barSt !== sk) {
+        e.barSt = sk;
+        e.bar.querySelector('.abl-st').innerHTML = e.statuses.slice(0, 3).map(s => `<span class="${s.key}" title="${s.label}" aria-label="${s.label}">${ic(s.key === 'guard' ? 'team' : s.key === 'burn' ? 'flame' : 'spark')}</span>`).join('');
+      }
     });
   }
 
@@ -3207,7 +3284,12 @@ class ActionBattle {
   number(u, n, cls, color) {
     if (this.headless) return;
     const lay = this.q('.ab-labels');
-    if (lay.childElementCount > 70) return;
+    // Rapid multi-hit attacks share a short-lived number instead of filling the field with text.
+    const packed = u.numberPacks?.[cls];
+    if (packed && packed.el.isConnected && this.time - packed.at < .1) {
+      packed.n += n; packed.el.textContent = (cls === 'heal' ? '+' : '') + packed.n.toLocaleString(); return;
+    }
+    if (lay.querySelectorAll('.abl-num').length >= (SAVE.settings.gfx === 'low' ? 14 : 24)) return;
     const [x, y] = this.screenPos(u, (u.boss ? 2.6 : 1.1) + Math.random() * 0.4);
     const el = document.createElement('div');
     el.className = 'abl-num ' + cls;
@@ -3216,11 +3298,15 @@ class ActionBattle {
     el.style.left = (x + (Math.random() - 0.5) * 40) + 'px';
     el.style.top = y + 'px';
     lay.appendChild(el);
+    if (!u.numberPacks) u.numberPacks = {};
+    u.numberPacks[cls] = { el, n, at: this.time };
     setTimeout(() => el.remove(), cls === 'crit' ? 1000 : 800);
   }
 
   floatText(u, text, cls) {
     if (this.headless) return;
+    if (u.lastFloat === text && this.time - u.lastFloatAt < .7) return;
+    u.lastFloat = text; u.lastFloatAt = this.time;
     const [x, y] = this.screenPos(u, u.boss ? 3.4 : 1.7);
     const el = document.createElement('div');
     el.className = 'abl-tag ' + cls;
@@ -3301,32 +3387,15 @@ class ActionBattle {
   cutIn(u, name) {
     const cut = SAVE.settings.cutins || 'full';
     this.snd('ult');
-    // Dim the arena and let the glow bloom harder while the Ultimate plays out.
-    this.screenTint('#120a24', 1.4);
-    if (this.bloom) this.bloom.strength = 0.8;
-    this.punch = 1;
-    this.fx.flatRing(u.pos.x, u.pos.z, u.def.color, 0.5, 5, 0.6, { bright: 1.4, alpha: 0.8 });
-    this.stars.emit(u.pos.x, 0.8, u.pos.z, { n: 24, speed: 5, color: u.def.color, life: 0.9, size: 0.5, grav: 0, up: 0.8 });
-    this.camZoomTo = 0.62;
-    setTimeout(() => { this.camZoomTo = 1; }, cut === 'off' ? 500 : 1300);
+    this.screenTint('#17323c', .65); this.punch = .35;
+    this.fx.flatRing(u.pos.x, u.pos.z, u.def.color, .5, 3.8, .45, { bright: .85, alpha: .45 });
     if (cut === 'off') return;
-    // 3D close-up: the camera cuts in on her face against a burst of rays in her colour.
-    const dur = cut === 'short' ? 0.55 : 1.0;
-    const back = new THREE.Mesh(geo('cutBack', () => new THREE.PlaneGeometry(9, 9)),
-      new THREE.MeshBasicMaterial({ map: raysTex(), color: new THREE.Color(u.def.color).lerp(new THREE.Color('#ffffff'), 0.25), fog: false }));
-    back.position.set(u.pos.x - Math.sin(u.facing) * 0.8, (u.model.faceY || 1) * (u.ms || 1), u.pos.z - Math.cos(u.facing) * 0.8);
-    this.scene.add(back);
-    this.closeUp = { u, t: 0, dur, back };
-    u.model.play('cheer');
-    u.model.setFace(2, dur);
-    const el = this.q('.ab-cut');
-    el.style.setProperty('--c', u.def.color);
-    el.innerHTML = `<i class="abc-band"></i><div class="abc-name"><em>${u.def.short} / ULTIMATE</em><b>${name}</b></div>`;
-    el.classList.remove('hidden', 'go');
-    void el.offsetWidth;
-    el.classList.add('go');
+    const dur = cut === 'short' ? .55 : 1;
     this.cutT = dur;
-    setTimeout(() => el.classList.add('hidden'), dur * 1000 + 250);
+    const el = this.q('.ab-cut'); el.style.setProperty('--c', u.def.color);
+    el.innerHTML = `<i class="abc-band"></i><img src="${ART[u.id].url}" alt="${u.def.name}"><div class="abc-name"><em>${u.def.short} / ULTIMATE</em><b>${name}</b></div>`;
+    el.classList.remove('hidden', 'go'); void el.offsetWidth; el.classList.add('go');
+    clearTimeout(this.cutTimer); this.cutTimer = setTimeout(() => el.classList.add('hidden'), dur * 1000);
   }
 
   endCloseUp() {
@@ -3378,7 +3447,7 @@ class ActionBattle {
     const st = this.stage, el = this.q('.ab-title');
     el.querySelector('b').textContent = st.name;
     el.querySelector('span').textContent = st.raid ? 'RANKED RAID' : st.run ? 'BRACKET RUN' : st.tower ? `STREAM TOWER · FLOOR ${st.floor}/${TOWER_FLOORS}`
-      : st.event ? 'EVENT' : st.daily ? 'DAILY STREAM' : `STAGE ${st.id}${this.stage.waves.length > 1 ? ` · ${this.stage.waves.length} WAVES` : ''}`;
+      : st.event ? 'EVENT' : st.daily ? 'DAILY STREAM' : `STAGE ${st.id}${this.stage.waves.length > 1 ? ` · ${this.stage.waves.length} ${this.routeEnabled ? 'AREAS' : 'WAVES'}` : ''}`;
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   }
 
@@ -3435,7 +3504,7 @@ const SHOT_STYLE = {
 const RAID_HP_MULT_A = 12;
 const CHIBI_SCALE = 1.15;   // members are drawn a little bigger than their hit circles
 // Battle camera: high and fairly far back, so you see the whole fight around you.
-const BATTLE_CAM = { yaw: 0, dist: 7.4, h: 9.0 };
+const BATTLE_CAM = { yaw: 0, dist: 11.5, h: 10.5 };
 // Camera distance setting (pause menu): multiplies the battle camera's distance and height.
 const CAM_ZOOM = { close: 0.8, normal: 1, far: 1.22 };
 const battleCam = () => { const k = CAM_ZOOM[SAVE.settings.camDist] || 1; return { yaw: 0, dist: BATTLE_CAM.dist * k, h: BATTLE_CAM.h * k }; };

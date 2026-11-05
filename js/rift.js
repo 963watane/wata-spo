@@ -194,6 +194,7 @@ async function runBattle(kind) {
   $('#battle').innerHTML = `<div class="ab-loading"><div class="logo">${logoHtml()}</div><b>${stage.name}</b><i></i></div>`;
   if (!(await whenThree())) { toast('The 3D battle engine could not load. Check your connection.'); return show('rift'); }
   await loadChibiModels();
+  await SpoEnvironment.load();
   run.perks = runPerks(run);
   const opts = { run, elite: kind === 'elite', hpMult: kind === 'elite' ? 1.1 : 1, onFinish: (b, win) => runRoundOver(b, win, kind) };
   currentBattle = new ActionBattle($('#battle'), stage, run.team, reason => {
@@ -213,7 +214,11 @@ function runRoundOver(b, win, kind) {
   run.node++;
   persist();
   h.model.setState('win');
-  b.camZoomTo = 0.5;
+  h.model.root.visible = false; if (h.shadow) h.shadow.visible = false;
+  b.root.classList.add('scene', 'ended');
+  const mvp = [h, ...b.supports].reduce((best, u) => (u.dmg || 0) > (best.dmg || 0) ? u : best, h);
+  const art = document.createElement('img'); art.className = 'run-result-art'; art.src = ART[mvp.id].url; art.alt = mvp.def.name; b.root.appendChild(art);
+  b.camZoomTo = 1;
   sfx('win');
   const last = run.node >= run.path.length;
   b.banner(last ? 'CHAMPION!' : 'ROUND CLEAR', 'finish');

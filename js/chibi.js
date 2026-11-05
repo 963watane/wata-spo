@@ -14,7 +14,7 @@ function whenThree(ms = 12000) {
 }
 
 const INK = '#2a1d2c';     // outline colour
-const INK_W = 0.017;       // outline thickness (world units at scale 1)
+const INK_W = 0.01;       // outline thickness (world units at scale 1)
 
 // Shared three.js resources, created on first use (three.js loads after this file).
 const C3 = {};
@@ -279,19 +279,19 @@ const CH0 = { by: 0, bx: 0, bry: 0, brz: 0, hx: 0, hy: 0, hz: 0, alx: 0, alz: 0.
 
 // One-shot actions: keyframes over 0..1 of the action's duration.
 const CHIBI_ACTS = {
-  slashA: { dur: 0.3, face: 4, keys: [[0, { arx: -1.1, arz: -1.5, bry: 0.75, bx: 0.08 }], [0.32, { arx: -1.5, arz: -0.25, bry: -0.65, bx: 0.18 }], [1, { arx: -0.7, arz: -0.35, bry: -0.3, bx: 0.1 }]] },
-  slashB: { dur: 0.3, face: 4, keys: [[0, { arx: -1.4, arz: 0.3, bry: -0.6, bx: 0.08 }], [0.32, { arx: -1.3, arz: -1.5, bry: 0.7, bx: 0.15 }], [1, { arx: -0.8, arz: -0.9, bry: 0.3, bx: 0.08 }]] },
-  slam:   { dur: 0.42, face: 4, keys: [[0, { arx: -2.9, alx: -2.4, jy: 0.28, bx: -0.2, sq: 1.05 }], [0.42, { arx: -0.6, alx: -0.5, jy: 0, bx: 0.38, sq: 0.84 }], [1, { arx: -0.5, alx: -0.3, bx: 0.12, sq: 1 }]] },
-  shoot:  { dur: 0.24, face: 4, keys: [[0, { arx: -1.55, arz: -0.05, bry: 0.3, hy: -0.15 }], [0.25, { arx: -1.85, bry: 0.34, bx: -0.08, hy: -0.15 }], [1, { arx: -1.5, bry: 0.25, hy: -0.1 }]] },
-  throw:  { dur: 0.3, face: 4, keys: [[0, { arx: 0.9, arz: -0.4, bry: 0.5 }], [0.35, { arx: -2.0, arz: -0.2, bry: -0.45, bx: 0.15 }], [1, { arx: -0.9, bry: -0.15 }]] },
-  cast:   { dur: 0.6, face: 2, keys: [[0, { alx: -0.6, arx: -0.6, alz: 0.8, arz: -0.8 }], [0.35, { alx: -2.8, arx: -2.8, alz: 0.35, arz: -0.35, jy: 0.16, hx: -0.25 }], [1, { alx: -2.5, arx: -2.5, alz: 0.45, arz: -0.45, jy: 0, hx: -0.1 }]] },
-  spin:   { dur: 0.5, face: 4, spin: Math.PI * 4, keys: [[0, { arz: -1.45, alz: 1.45, jy: 0.05 }], [1, { arz: -1.45, alz: 1.45, jy: 0 }]] },
+  slashA: { dur: 0.3, face: 4, keys: [[0, { arx: -0.65, arz: -0.6, bry: 0.12 }], [0.2, { arx: -1.15, arz: -1.15, bry: 0.48, bx: -0.04 }], [0.42, { arx: -1.4, arz: -0.2, bry: -0.48, bx: 0.16 }], [0.7, { arx: -0.85, arz: -0.25, bry: -0.24, bx: 0.08 }], [1, { arx: -0.55, arz: -0.3, bry: 0 }]] },
+  slashB: { dur: 0.3, face: 4, keys: [[0, { arx: -0.85, arz: -0.2, bry: -0.22 }], [0.2, { arx: -1.15, arz: 0.1, bry: -0.45, bx: -0.03 }], [0.42, { arx: -1.35, arz: -1.2, bry: 0.5, bx: 0.12 }], [0.7, { arx: -0.8, arz: -0.9, bry: 0.25 }], [1, { arx: -0.55, arz: -0.3, bry: 0 }]] },
+  slam: { dur: 0.42, face: 4, keys: [[0, { arx: -1, alx: -0.8, bx: -0.05 }], [0.26, { arx: -2.1, alx: -1.8, bx: -0.12, sq: 0.96 }], [0.48, { arx: -0.6, alx: -0.5, bx: 0.25, sq: 0.94 }], [0.7, { arx: -0.5, alx: -0.3, bx: 0.1 }], [1, { arx: -0.4, alx: -0.25, bx: 0, sq: 1 }]] },
+  shoot: { dur: 0.24, face: 4, keys: [[0, { arx: -1.42, arz: -0.1, bry: 0.16, hy: -0.1 }], [0.24, { arx: -1.53, bry: 0.22, bx: 0.04 }], [0.38, { arx: -1.72, bry: 0.29, bx: -0.07 }], [1, { arx: -1.4, bry: 0.18, hx: 0, bx: 0 }]] },
+  throw: { dur: 0.3, face: 4, keys: [[0, { arx: -0.3, arz: -0.3, bry: 0.12 }], [0.23, { arx: 0.25, arz: -0.38, bry: 0.4 }], [0.42, { arx: -1.75, arz: -0.18, bry: -0.32, bx: 0.1 }], [0.7, { arx: -0.9, bry: -0.14 }], [1, { arx: -0.4, bry: 0, bx: 0 }]] },
+  cast: { dur: 0.6, face: 4, keys: [[0, { alx: -0.5, arx: -0.5, alz: 0.5, arz: -0.5 }], [0.3, { alx: -1.4, arx: -1.4, alz: 0.65, arz: -0.65, bx: -0.08 }], [0.5, { alx: -2.1, arx: -2.1, alz: 0.38, arz: -0.38, hx: -0.1 }], [1, { alx: -1.3, arx: -1.3, alz: 0.5, arz: -0.5, bx: 0 }]] },
+  spin:   { dur: 0.5, face: 4, spin: Math.PI * 2, keys: [[0, { arz: -1.45, alz: 1.45, jy: 0.05 }], [1, { arz: -1.45, alz: 1.45, jy: 0 }]] },
   dash:   { dur: 0.3, keys: [[0, { bx: 0.55, alx: 1.0, arx: 1.0, llx: 0.7, lrx: -0.4, jy: 0.04 }], [1, { bx: 0.45, alx: 0.8, arx: 0.8, llx: 0.5, lrx: -0.3, jy: 0 }]] },
   hit:    { dur: 0.32, face: 3, keys: [[0, { bx: -0.35, hx: -0.3, alz: 0.7, arz: -0.7 }], [1, { bx: 0, hx: 0 }]] },
   cheer:  { dur: 0.9, face: 2, keys: [[0, { arx: -2.9, arz: -0.3, alz: 0.5, hz: 0.1 }], [0.3, { jy: 0.36, arx: -3.0, arz: -0.2, sq: 1.08 }], [0.6, { jy: 0, sq: 0.9, arx: -2.8 }], [1, { jy: 0, sq: 1, arx: -2.7, arz: -0.3 }]] },
   talk:   { dur: 0.55, keys: [[0, { hz: 0.08, arx: -0.5, arz: -0.45, jy: 0 }], [0.45, { hz: -0.06, hx: 0.06, arx: -1.05, arz: -0.35, jy: 0.06 }], [1, { hz: 0, arx: -0.35, arz: -0.3, jy: 0 }]] },
   peace:  { dur: 0.8, face: 2, keys: [[0, { arx: -2.5, arz: -0.8, hz: 0.14, bry: -0.2 }], [1, { arx: -2.6, arz: -0.85, hz: 0.18, bry: -0.25 }]] },
-  leap:   { dur: 0.45, face: 2, spin: Math.PI * 2, keys: [[0, { jy: 2.6, alz: 1.2, arz: -1.2, sq: 1.15 }], [0.75, { jy: 0, alz: 0.8, arz: -0.8, sq: 0.82 }], [1, { jy: 0, sq: 1 }]] },
+  leap:   { dur: 0.45, face: 2, spin: Math.PI * 2, keys: [[0, { jy: 1.25, alz: 1.2, arz: -1.2, sq: 1.15 }], [0.75, { jy: 0, alz: 0.8, arz: -0.8, sq: 0.82 }], [1, { jy: 0, sq: 1 }]] },
 };
 
 class Chibi {
@@ -619,10 +619,10 @@ class Chibi {
 
   apply(dt) {
     const c = this.ch, j = this.j, r = this.rig;
-    r.position.y = c.jy + c.ko * 0.1;
+    r.position.y = c.jy * .72 + c.ko * 0.1;
     r.position.z = -c.ko * 0.35;
     r.rotation.set(-c.ko * 1.42, this.spinNow, 0);
-    const sq = Math.max(0.6, c.sq);
+    const sq = Math.max(.85, 1 + (c.sq - 1) * .35);
     r.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
     if (this.glb) {
       this.glb.mixer.update(dt);

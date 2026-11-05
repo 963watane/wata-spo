@@ -26,7 +26,8 @@ class FoeModel {
     this.flashT = 0; this.flashColor = new THREE.Color('#ffffff');
     this.float = 0.06;
     this.eyes = []; this.blinkT = 1 + Math.random() * 3;
-    (FOE_BUILD[key] || FOE_BUILD.grunt).call(this);
+    if (['grunt', 'sniper', 'spammer', 'firewall', 'desync', 'troll', 'clipper'].includes(key)) this.buildShade(key);
+    else (FOE_BUILD[key] || FOE_BUILD.grunt).call(this);
     // A solid overhead cue stays legible when ground warnings overlap.
     const warningMat = new THREE.MeshBasicMaterial({ color: '#ff526b', transparent: true, opacity: 0.9, depthWrite: false });
     this.mats.push(warningMat);
@@ -40,6 +41,52 @@ class FoeModel {
   }
   play(name, dur) { const def = FOE_ACTS[name]; if (def) this.action = { def, t: 0, dur: dur || def.dur }; }
   setState(s) { this.state = s; }
+  // Cloaked signal fragments: narrow masks, draped silhouettes and distinct weapons.
+  buildShade(kind) {
+    const T = THREE, heavy = kind === 'firewall' || kind === 'troll';
+    const body = hueHex(this.hue, .16, .26), trim = hueHex(this.hue, .24, .58);
+    const g = this.group(this.rig, [0, .15, 0]);
+    const cloth = geo('shadeCloak:' + heavy, () => new T.LatheGeometry([
+      new T.Vector2(.12, 0), new T.Vector2(heavy ? .54 : .38, .12), new T.Vector2(heavy ? .5 : .3, .47),
+      new T.Vector2(heavy ? .42 : .24, .8), new T.Vector2(.18, 1.1), new T.Vector2(.05, 1.16),
+    ], 28));
+    this.part(g, cloth, body, { inkW: .009 });
+    const hood = this.part(g, G.sph(), body, { p: [0, 1.08, .02], s: [.3, .34, .28], inkW: .009 });
+    this.part(g, G.sph(), '#18282e', { p: [0, 1.06, .21], s: [.21, .24, .07], ink: false });
+    // One luminous slit rather than a cartoon face.
+    this.part(g, G.box(.21, .025, .018), '#e3a2a1', { p: [0, 1.1, .28], r: [0, 0, -.08], ink: false, m: { emissive: '#cb777c', ei: .45 } });
+    this.part(g, G.tor(.25, .018, Math.PI * 1.55, 28), trim, { p: [0, 1.1, .1], r: [.3, 0, .8], ink: false });
+    for (const side of [-1, 1]) {
+      const shoulder = this.group(g, [side * .26, .82, 0], [0, 0, side * .34]);
+      this.part(shoulder, G.cone(.18, .63, 24), body, { p: [side * .12, -.17, 0], r: [0, 0, side * .45], s: [1, 1, .65], inkW: .008 });
+      const tail = this.part(g, G.cone(.07, .68, 18), trim, { p: [side * .22, .08, -.08], r: [0, 0, side * .35], s: [1, 1, .36], ink: false });
+      this.sway.push({ obj: tail, axis: 'z', base: side * .35, amp: .08, f: 2, ph: side });
+    }
+    if (kind === 'sniper') {
+      const staff = this.group(g, [.46, .57, .08], [0, 0, -.13]);
+      this.part(staff, G.cyl(.026, .026, 1.5, 12), '#8eaaac', { ink: false });
+      this.part(staff, G.tor(.2, .035, Math.PI * 1.7, 28), '#bf969f', { p: [0, .75, 0], r: [0, .4, .3], ink: false });
+      const lens = this.eye(staff, [0, .75, 0], [.08, .12, .04], '#cf9d9d', .5);
+      this.pulse.push({ obj: lens, base: .08, amp: .08, f: 2 });
+    } else if (kind === 'firewall') {
+      const shield = this.part(g, geo('shadeShield', () => new T.SphereGeometry(.48, 24, 18, 0, Math.PI)), '#8f9d91', { p: [0, .56, .33], s: [1.18, 1.25, .22], inkW: .01 });
+      this.part(g, G.tor(.26, .024, Math.PI * 1.8, 24), '#ceb78d', { p: [0, .62, .48], r: [0, 0, .3], ink: false });
+    } else if (kind === 'desync') {
+      for (const side of [-1, 1]) {
+        const shard = this.part(g, geo('shadeShard', () => new T.OctahedronGeometry(1)), side < 0 ? '#9aafbc' : '#c0a2b5', { p: [side * .48, .56, 0], s: [.12, .4, .1], inkW: .008 });
+        this.sway.push({ obj: shard, axis: 'z', base: side * .2, amp: .14, f: 1.9, ph: side });
+      }
+    } else if (kind === 'clipper') {
+      for (const side of [-1, 1]) this.part(g, G.cone(.055, .94, 12), '#c0c9ba', { p: [side * .5, .62, .12], r: [.1, 0, side * -.65], inkW: .007 });
+    } else if (kind === 'troll') {
+      for (const side of [-1, 1]) this.part(g, G.cone(.08, .5, 16), '#c6aa8a', { p: [side * .24, 1.43, -.04], r: [0, 0, -side * .4], inkW: .008 });
+    } else if (kind === 'spammer') {
+      const orbit = this.group(g, [0, .65, 0]);
+      for (let i = 0; i < 3; i++) this.part(orbit, geo('shadePage', () => new T.PlaneGeometry(.2, .3)), '#c6cab3', { p: [Math.sin(i * 2.094) * .63, Math.cos(i * 2.094) * .16, Math.cos(i * 2.094) * .4], r: [.2, i * 2.094, .2], ink: false, m: { side: T.DoubleSide } });
+      this.spin.push({ obj: orbit, axis: 'y', speed: .45 });
+    }
+    this.float = .035;
+  }
   flash(color = '#ffffff', t = 0.1) { this.flashColor.set(color); this.flashT = t; this.flashMax = t; }
   eye(parent, p, s, color = '#fff6c2', glow = 1.6) {
     return this.part(parent, G.sph(), color, { p, s, ink: false, m: { emissive: color, ei: glow } });
@@ -76,7 +123,7 @@ class FoeModel {
     }
     const kk = 1 - Math.exp(-dt * (a ? 30 : 12));
     Object.keys(tg).forEach(ch => { c[ch] += (tg[ch] - c[ch]) * kk; });
-    const r = this.rig, sq = Math.max(0.5, c.sq);
+    const r = this.rig, sq = Math.max(.85, 1 + (c.sq - 1) * .4);
     r.position.set(0, c.y, c.lunge);
     r.rotation.set(c.lean, 0, c.tilt);
     r.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
