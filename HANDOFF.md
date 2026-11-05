@@ -4,6 +4,65 @@ Shared notes between the AI assistants working on this repo (ChatGPT and Claude)
 Before starting: pull the latest `main`, then read this file and `AGENTS.md`.
 When you stop: add an entry here and push.
 
+## 2026-11-04 · Codex · Studio redesign and connected story areas
+
+The owner requested a complete original redesign inspired by the polish of an anime action RPG,
+including gameplay/progression changes. This supersedes the rejected Daylight recolour.
+Keep WATA SPO's own layout and assets; no Stella Sora assets or copied layouts were used.
+
+Changes:
+- studio.css, js/ui.js, both HTML entrypoints: new framed-art lobby, navigation rail, readable chapter
+  route, side-by-side encounter preparation, matching recruit/reward/login/member/menu surfaces.
+- js/experience.js and js/save.js: exact-cost squad training with HP/ATK previews; free-switching
+  milestone tactics (1-2 Spotlight, 1-4 Safe Harbor, 2-1 Relay). Old presets migrate to Balanced.
+  Ranked, tutorial and Bracket Run keep their own rules. Save key and existing progress preserved.
+- js/environment.js: painted ground and cool slate, rounded planters, original tree/cafe billboards,
+  panorama scenery, connected courtyards and passages. Geometry/textures cached; Low has fewer props.
+  Eight original generated environment assets under assets/environment/ (each below 500 KB);
+  README there records all prompts/provenance. PNGs preserve alpha. No member art was generated/edited.
+- js/action.js: manual or assisted forward travel between story encounters; Auto travels too.
+  World rebasing keeps collision and skill maths local. Travel and closing dialogue are excluded from
+  the star clock. Idempotent result rewards; actual highest-damage MVP uses existing owner illustration.
+  Field conversations and Ultimate cut-ins also use the existing illustrated member art.
+- js/chibi.js: finer outlines, restrained grounded action poses with anticipation/contact/recovery,
+  less squash, lower leap/spin. js/foes3d.js and js/icons.js: hooded enemy silhouettes and matching portraits.
+- Combat: quieter bloom/particles, subdued paint residue, bounded/briefly combined damage numbers,
+  compact enemy status icons, input buffering near the end of a manual action, explicit Auto state.
+- js/story.js: painted story backgrounds, evening context for the opening scene; original visual-novel
+  dialogue and member art retained. js/rift.js: illustrated round-clear MVP over the Boost choices.
+- js/help.js, js/screens.js, js/live.js: current controls, travel/training/tactic guidance and correct
+  90-second/12x-HP Ranked explanation. Original credits are all retained.
+- PLAY.cmd/play.cjs/PLAYING.md: optional Node local launcher; original Python launcher remains.
+
+Validation completed:
+- All shared browser scripts compile together; both HTML script/style lists match. JS syntax checks,
+  diff whitespace and 12 node regression checks pass (migration, cost atomicity, tactic gates, clocks).
+- 54/54 headless story runs won: all 18 stages, seeds 17/42/93, Tsuna/Hinano/Lisa at recommended level.
+  Compared with previous HEAD 9854283 under identical save/seed: exactly matching 2-3 simulation
+  (win/time51/hp90/dmg38377). Earlier log baselines used different save snapshots.
+- 11 tactical battle checks passed (four stat/support modifiers + seeded wins, special-mode isolation).
+- Actual rendered starter-profile 1-2 clear with Lv3 Tsuna/Sendo/Noah, Auto: traversed both areas,
+  won with >90% HP, 19-second result, three stars and Spotlight unlock. Closing dialogue was left open
+  substantially longer; its reading time did not inflate the result. No forced victory for this check.
+- Real fresh onboarding in plain production entrypoint reached the first victory, after-story,
+  starter choice/recruit, then persisted the owned starter and subsequent training across reloads.
+- Keyboard ticket launch, card reveal, illustrated recruit continuation and rewards; exact 900-token
+  three-member upgrade; insufficient-funds disabled state; desktop and 844x390 layouts checked.
+- Actual Bracket Run round reached victory and the illustrated Boost screen. Tower/Ranked menus reviewed.
+- Local eight-second frame sample at 844x390 High: 144 fps, p95 7.1ms. This is this computer only,
+  not certification on every mid-range laptop. Post-process draw-call counters were not a scene benchmark.
+
+Limits / next work:
+- No complete manual campaign playthrough or every special-mode payout checked. OS-level reduced-motion
+  preference was not emulated; CSS and Low/flash/shake/cut-in branches are present. Continue real-device QA.
+- Member models still share the simplified original rig/recolours; elbow stretch is reduced by the poses,
+  not eliminated. Echo/boss models retain their earlier designs. Music slots still need licensed tracks.
+  This is a much improved browser fan-game prototype, not commercial-game art/animation parity.
+- Legacy hall-building helpers remain unused in action.js as a fallback reference. Current buildArena
+  delegates to SpoEnvironment. Do not remove shared texture/geometry helpers without checking usages.
+- QA buttons/servers/screenshots live outside the repo and are not part of the shipped game.
+- Publication and final archive/link status will be recorded in the follow-up entry after verification.
+
 ## 2026-11-04 · Codex · Combat payoff and results
 
 Next visual pass in js/action.js and action.css:
