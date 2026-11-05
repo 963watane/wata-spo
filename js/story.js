@@ -36,13 +36,15 @@ function playStory(lines, title = '', sceneId = null) {
     ov.className = 'overlay show';
     // "1-3 · Name" → kicker "1-3", heading "Name"; talks are "Off-stream · Name".
     const [kicker, heading] = title.includes(' · ') ? title.split(' · ') : ['', title];
-    ov.innerHTML = `<div class="story intro">
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    ov.innerHTML = `<div class="story intro${calm || SAVE.settings.flashes === false ? ' visual-calm' : ''}">
       <div class="story-bg ${sceneId ? 'has-scene' : ''}">${sceneId ? `<div class="story-scene ${BACKGROUNDS[sceneId] ? 'env' : ''}" style="${sceneStyle(sceneId)}"></div>` : ''}</div>
       <div class="story-cam"><div class="story-slot left"></div><div class="story-slot right"></div></div>
       <div class="story-vignette"></div>
       <div class="story-bars"><i></i><i></i></div>
       ${creditHtml(sceneId) ? `<span class="story-credit">${creditHtml(sceneId)}</span>` : ''}
       <div class="story-title"><em>${kicker}</em>${heading}</div>
+      <div class="story-progress"><span></span><i></i></div>
       <div class="story-ctrl">
         <button class="sc-auto ${STORY_PREFS.auto ? 'on' : ''}">${ic('auto')}<span>Auto</span></button>
         <button class="sc-log">${ic('story')}<span>Log</span></button>
@@ -71,10 +73,10 @@ function playStory(lines, title = '', sceneId = null) {
       const info = speakerInfo(id), el = $('.story-slot.' + side, ov);
       el.innerHTML = info.art ? `<img src="${info.art}" alt="">` : foeSprite(id, info.hue, 'story-foe');
       el.classList.toggle('enemy', !!info.enemy);
-      el.animate([{ opacity: 0, transform: `translateX(${side === 'left' ? -80 : 80}px)` }, { opacity: 1, transform: 'none' }],
-                 { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      el.animate([{ opacity: 0, transform: calm ? 'none' : `translateX(${side === 'left' ? -40 : 40}px)` }, { opacity: 1, transform: 'none' }],
+                 { duration: 220, easing: 'ease-out' });
       // Enemies arrive with a red flash and a jolt.
-      if (info.enemy) {
+      if (info.enemy && SAVE.settings.flashes !== false && !calm) {
         root.classList.remove('threat'); void root.offsetWidth; root.classList.add('threat');
         sfx('kill');
       }
@@ -82,6 +84,7 @@ function playStory(lines, title = '', sceneId = null) {
     }
 
     function react(side, mood) {
+      if (calm || (mood === 'shout' && SAVE.settings.shake === false)) return;
       const img = $('.story-slot.' + side, ov).firstElementChild;
       if (!img) return;
       const k = {
@@ -141,6 +144,8 @@ function playStory(lines, title = '', sceneId = null) {
         return;
       }
       if (++i >= lines.length) return end();
+      $('.story-progress span', ov).textContent = `${i + 1} / ${lines.length}`;
+      $('.story-progress i', ov).style.width = ((i + 1) / lines.length * 100) + '%';
       const [who, text, nameOverride] = lines[i];
       const info = speakerInfo(who, nameOverride);
       log.push({ name: info.name, color: info.color, text: who === 'chat' ? text.split(' / ').join('  ·  ') : text });
