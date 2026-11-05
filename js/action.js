@@ -588,6 +588,61 @@ class ActionFx {
     return this.add(m, dur, (k, o, dt) => { const sc = r * (0.6 + 0.4 * Math.min(1, k * 4)); m.scale.set(sc, 1, sc); m.rotation.y += spin * dt; m.material.opacity = k < 0.7 ? Math.min(1, k * 6) : (1 - k) / 0.3; }, () => m.material.dispose());
   }
   tint(color, dur) { this.b.screenTint(color, dur); }
+  // One cached emblem per member; cast shapes stay separate from red danger zones.
+  signature(u, ultimate = false) {
+    if (!this.budget('signature', 2)) return;
+    const low = SAVE.settings.gfx === 'low', quiet = SAVE.settings.flashes === false;
+    const map = canvasTex('memberCast:' + u.id, 256, 256, g => {
+      g.translate(128, 128); g.strokeStyle = g.fillStyle = '#ffffff';
+      g.lineWidth = 7; g.lineCap = 'round'; g.lineJoin = 'round';
+      const circle = r => { g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.stroke(); };
+      if (u.id === 'sendo') {
+        circle(34);
+        for (let i = 0; i < 12; i++) { g.rotate(Math.PI / 6); g.beginPath(); g.moveTo(54, 0); g.lineTo(92, 0); g.stroke(); }
+      } else if (u.id === 'hinano') {
+        g.beginPath(); g.moveTo(0, -92); g.lineTo(75, -55); g.lineTo(60, 38); g.quadraticCurveTo(30, 77, 0, 94); g.quadraticCurveTo(-30, 77, -60, 38); g.lineTo(-75, -55); g.closePath(); g.stroke();
+        circle(30); g.beginPath(); g.moveTo(-14, 0); g.lineTo(14, 0); g.moveTo(0, -14); g.lineTo(0, 14); g.stroke();
+      } else if (u.id === 'noah') {
+        g.beginPath(); g.arc(0, 0, 85, 0.5, 5.8); g.stroke();
+        g.beginPath(); g.moveTo(-65, 45); g.lineTo(48, -64); g.moveTo(-34, 65); g.lineTo(65, -34); g.stroke();
+      } else if (u.id === 'tsuna') {
+        for (let i = 0; i < 5; i++) { g.rotate(Math.PI * 2 / 5); g.beginPath(); g.ellipse(0, -55, 15, 35, 0, 0, Math.PI * 2); g.fill(); }
+        circle(17);
+      } else if (u.id === 'uruha') {
+        circle(58); circle(25);
+        for (let i = 0; i < 4; i++) { g.rotate(Math.PI / 2); g.beginPath(); g.moveTo(44, 0); g.lineTo(102, 0); g.stroke(); }
+      } else {
+        circle(70); circle(38);
+        for (let i = 0; i < 8; i++) { g.rotate(Math.PI / 4); g.beginPath(); g.moveTo(50, -6); g.lineTo(58, 6); g.stroke(); }
+      }
+    });
+    const mat = this.basic(u.def.color, { map, bright: quiet ? 0.9 : 1.3, normal: quiet });
+    const emblem = new THREE.Mesh(geo('memberCastPlane', () => new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2)), mat);
+    emblem.position.set(u.pos.x, 0.12, u.pos.z);
+    const size = ultimate ? 3.2 : 1.65, dur = ultimate ? 1.15 : 0.7;
+    const spin = u.id === 'uruha' || u.id === 'hinano' ? 0 : u.id === 'noah' ? -0.7 : 0.35;
+    this.add(emblem, dur, k => {
+      const scale = size * (k < 0.22 ? 1.2 - k : 0.98 + (k - 0.22) * 0.5);
+      emblem.scale.set(scale, 1, scale); emblem.rotation.y = u.facing + k * spin;
+      mat.opacity = (quiet ? 0.45 : 0.7) * Math.min(1, k * 9) * Math.min(1, (1 - k) * 3);
+    }, () => mat.dispose());
+    if (low) return;
+    const count = ultimate ? 8 : 4, shards = new THREE.Group();
+    const shardMat = this.basic(u.def.color, { bright: quiet ? 0.9 : 1.4, normal: quiet });
+    const shape = u.id === 'hinano' ? 'guard' : u.id === 'uruha' || u.id === 'noah' ? 'blade' : 'petal';
+    const geometry = geo('memberShard:' + shape, () => shape === 'guard' ? new THREE.RingGeometry(0.7, 1, 6) : new THREE.PlaneGeometry(shape === 'blade' ? 0.12 : 0.3, 0.8));
+    for (let i = 0; i < count; i++) {
+      const a = i / count * Math.PI * 2, m = new THREE.Mesh(geometry, shardMat);
+      m.position.set(Math.sin(a) * size * 0.65, 0.4, Math.cos(a) * size * 0.65);
+      m.rotation.set(-0.4, a, shape === 'blade' ? 0.6 : 0); m.scale.setScalar(shape === 'guard' ? 0.3 : 0.65);
+      shards.add(m);
+    }
+    shards.position.set(u.pos.x, 0, u.pos.z);
+    this.add(shards, dur, k => {
+      shards.scale.setScalar(0.7 + k * 0.8); shards.position.y = k * (ultimate ? 1.8 : 0.8);
+      shards.rotation.y = u.facing + k * spin; shardMat.opacity = (quiet ? 0.35 : 0.65) * (1 - k);
+    }, () => shardMat.dispose());
+  }
   shake(a) { this.b.shake = Math.min(1, this.b.shake + a); }
 }
 
@@ -1638,7 +1693,7 @@ class ActionBattle {
     h.atk_ = null;
     const t = this.nearestFoe(h.pos, 12);
     if (t) this.faceTo(h, t.pos);
-    this.fx.circle(h.pos.x, h.pos.z, 1.7, h.def.color, 0.65);
+    this.fx.signature(h);
     this.skillName(h, h.kit.skill.name);
     this.startTally(h, 'skill');
     h.kit.skill.run(this, h);
@@ -1669,9 +1724,7 @@ class ActionBattle {
     const go = () => {
       this.startTally(h, 'ult');
       h.model.play('cast');
-      this.fx.circle(h.pos.x, h.pos.z, 3.4, h.def.color, 1.5);
-      this.fx.pillar(h.pos.x, h.pos.z, h.def.color, 0.9, 1.3, 10);
-      this.streaks.emit(h.pos.x, 0.3, h.pos.z, { n: 30, speed: 14, color: h.def.color, up: 1.4, life: 0.5, width: 0.08, grav: 2 });
+      this.fx.signature(h, true);
       h.kit.ult.run(this, h);
       if (h.mem && h.mem.type === 'ultAtk') this.buff(h, 'atk', h.mem.v / 100, 10, 'ATK↑');
       if (this.perks.ultHeal) this.healHero(h.maxHp * 0.1 * this.perks.ultHeal, h);
@@ -3106,6 +3159,7 @@ class ActionBattle {
   }
 
   flashScreen(kind) {
+    if (SAVE.settings.flashes === false) return;
     const f = this.q('.ab-flash');
     f.className = 'ab-flash ' + kind;
     void f.offsetWidth;
@@ -3154,7 +3208,7 @@ class ActionBattle {
     u.model.setFace(2, dur);
     const el = this.q('.ab-cut');
     el.style.setProperty('--c', u.def.color);
-    el.innerHTML = `<i class="abc-band"></i><div class="abc-name"><em>ULTIMATE</em><b>${name}</b></div>`;
+    el.innerHTML = `<i class="abc-band"></i><div class="abc-name"><em>${u.def.short} / ULTIMATE</em><b>${name}</b></div>`;
     el.classList.remove('hidden', 'go');
     void el.offsetWidth;
     el.classList.add('go');
