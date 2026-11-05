@@ -997,9 +997,10 @@ class ActionBattle {
       this.composer.addPass(this.bloom);
       // Gentle vignette and a touch more saturation: the anime-game finish.
       this.grade = new X.ShaderPass({
-        uniforms: { tDiffuse: { value: null }, dark: { value: 0.9 }, sat: { value: 1.12 } },
+        uniforms: { tDiffuse: { value: null }, dark: { value: th.outdoor ? 0.65 : 0.9 }, sat: { value: th.outdoor ? 1.08 : 1.14 },
+          tone: { value: new THREE.Color(th.outdoor ? '#fff1de' : th === ARENA_THEMES.rooftop ? '#dce9ff' : th === ARENA_THEMES.alley ? '#f2ddff' : '#ffe6dc') } },
         vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-        fragmentShader: 'uniform sampler2D tDiffuse; uniform float dark; uniform float sat; varying vec2 vUv; void main() { vec4 c = texture2D(tDiffuse, vUv); float l = dot(c.rgb, vec3(0.299, 0.587, 0.114)); c.rgb = mix(vec3(l), c.rgb, sat); vec2 d = vUv - 0.5; c.rgb *= 1.0 - dot(d, d) * dark; gl_FragColor = c; }',
+        fragmentShader: 'uniform sampler2D tDiffuse; uniform float dark; uniform float sat; uniform vec3 tone; varying vec2 vUv; void main() { vec4 c = texture2D(tDiffuse, vUv); float l = dot(c.rgb, vec3(0.299, 0.587, 0.114)); c.rgb = mix(vec3(l), c.rgb, sat) * mix(vec3(1.0), tone, 0.16); vec2 d = vUv - 0.5; c.rgb *= 1.0 - dot(d, d) * dark; gl_FragColor = c; }',
       });
       this.composer.addPass(this.grade);
       this.composer.addPass(new X.OutputPass());
@@ -1111,7 +1112,7 @@ class ActionBattle {
     for (let k = 0; k < 6; k++) put(new THREE.Mesh(G.box(3.2, 0.2, 0.6), toon(k % 2 ? stone : dark))).position.set(0, -0.3 - k * 0.2, R + 1.4 + k * 0.6);
     // Drifting motes.
     this.motes = new Sparks(s, glowTex(), 140);
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < (SAVE.settings.gfx === 'low' ? 24 : 90); i++) {
       const a = Math.random() * Math.PI * 2, d = Math.random() * (R + 8);
       this.motes.emit(Math.sin(a) * d, Math.random() * 7, Math.cos(a) * d, { n: 1, speed: 0.35, up: 1, color: th.mote, life: 1e6, size: 0.12, grav: 0, drag: 0, bright: 1.3 });
     }
@@ -1121,6 +1122,7 @@ class ActionBattle {
   // walkway and a skyline beyond; outdoor stages add planters and lamp posts instead of the wall.
   buildDressing(th, put, toon, glow, isGate) {
     const s = this.scene, R = ACT.arena, dark = shadeHex(th.ground, -0.36), mid = shadeHex(th.ground, -0.2);
+    this.buildLandmarks(th, toon, glow);
     const screen = new THREE.MeshBasicMaterial({ map: holoTex(th), transparent: true, opacity: 0.92, side: THREE.DoubleSide, color: new THREE.Color('#ffffff').multiplyScalar(1.25) });
     // floating screens over the far half
     [-1.15, -0.55, 0, 0.55, 1.15].forEach((k, i) => {
@@ -1170,6 +1172,68 @@ class ActionBattle {
         put(new THREE.Mesh(G.cyl(0.08, 0.12, 4, 8), toon('#3a3f52'))).position.set(lx, 1.8, lz);
         const lamp = put(new THREE.Mesh(G.sph(), glow('#fff2c8')), false, false);
         lamp.position.set(lx, 3.9, lz); lamp.scale.setScalar(0.28);
+      }
+    }
+  }
+
+  // Theme silhouettes sit outside the playable ring and leave the gates clear.
+  buildLandmarks(th, toon, glow) {
+    const bg = stageBg(this.stage), low = SAVE.settings.gfx === 'low';
+    this.arenaSignals = [];
+    const metal = toon('#37445b'), trim = toon('#93a5bd');
+    const box = geo('arenaDetailBox', () => new THREE.BoxGeometry(1, 1, 1));
+    const add = (parent, geometry, mat, x, y, z, sx = 1, sy = 1, sz = 1) => {
+      const m = new THREE.Mesh(geometry, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m;
+    };
+    const signal = (parent, x, y, z, color, phase) => {
+      const mat = glow(color); add(parent, box, mat, x, y, z, 0.2, 0.12, 0.2);
+      this.arenaSignals.push({ mat, base: mat.color.clone(), phase });
+    };
+    for (let side = -1; side <= 1; side += 2) {
+      const group = new THREE.Group(); group.position.set(side * (ACT.arena + 4), 0, -5); group.rotation.y = -side * 0.5;
+      this.scene.add(group);
+      if (bg === 'rooftop') {
+        add(group, box, metal, 0, 0.9, 0, 2.8, 1.8, 1.7);
+        if (!low) for (let i = 0; i < 5; i++) add(group, box, trim, 0, 0.35 + i * 0.25, 0.88, 2.3, 0.06, 0.05);
+        const tank = geo('arenaWaterTank', () => new THREE.CylinderGeometry(1.1, 1.1, 2, 16));
+        add(group, tank, trim, 0, 4, -2.5);
+        [-0.7, 0.7].forEach(x => add(group, box, metal, x, 1.8, -2.5, 0.12, 3.4, 0.12));
+        add(group, box, trim, side * 1.6, 3, 0, 0.07, 6, 0.07);
+        signal(group, side * 1.6, 6, 0, '#8edfff', side);
+      } else if (bg === 'alley') {
+        add(group, box, metal, 0, 2.5, 0, 0.14, 5, 0.14);
+        const tex = canvasTex('arenaNeon:' + side, 256, 128, g => {
+          g.fillStyle = '#11162d'; g.fillRect(0, 0, 256, 128);
+          g.strokeStyle = '#ff92e7'; g.lineWidth = 5; g.strokeRect(8, 8, 240, 112);
+          g.fillStyle = '#8eeeff'; g.font = 'bold 34px sans-serif'; g.textAlign = 'center';
+          g.fillText(side < 0 ? 'ON AIR' : 'LIVE / 24', 128, 66);
+          g.fillStyle = '#ff92e7'; g.fillRect(55, 88, 146, 5);
+        });
+        const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+        add(group, geo('arenaNeonBoard', () => new THREE.PlaneGeometry(3.4, 1.7)), mat, 0, 4.4, 0.12);
+        if (!low) this.arenaSignals.push({ mat, base: mat.color.clone(), phase: side * 2 });
+        add(group, box, trim, side * 1.2, 2, -0.6, 0.14, 4, 0.14);
+        add(group, box, trim, side * 0.5, 3.9, -0.6, 1.5, 0.14, 0.14);
+      } else if (bg === 'tunnel') {
+        for (let i = 0; i < (low ? 2 : 4); i++) {
+          add(group, box, metal, 0, 1.4, i * 2 - 3, 0.18, 2.8, 0.18);
+          signal(group, 0, 2.9, i * 2 - 3, '#ffd896', i + side);
+        }
+        add(group, box, trim, 0, 1.2, 0, 0.12, 0.12, 9);
+        add(group, box, trim, 0, 0.6, 0, 0.12, 0.12, 9);
+        add(group, box, metal, 0, 3.8, 0, 0.35, 0.35, 11);
+      } else {
+        const warm = bg === 'sunset-street', festival = bg === 'city-day';
+        add(group, box, metal, 0, 2.8, 0, 0.12, 5.6, 0.12);
+        add(group, box, metal, 1.1, 5.5, 0, 2.3, 0.1, 0.1);
+        const mat = toon(warm ? '#ffd69a' : festival ? '#9edcff' : '#f5b8d8');
+        if (warm) {
+          add(group, geo('arenaLantern', () => new THREE.SphereGeometry(0.6, 12, 8)), glow('#ffd6a1'), 1.8, 4.9, 0, 0.7, 1, 0.7);
+        } else {
+          add(group, box, mat, 1.1, 4.4, 0, 1.8, 1.8, 0.04);
+          add(group, box, trim, 1.1, 4.4, 0.05, 1.3, 0.1, 0.02);
+          if (!low) add(group, geo('arenaBannerSeal', () => new THREE.RingGeometry(0.28, 0.36, 6)), trim, 1.1, 4.8, 0.06);
+        }
       }
     }
   }
@@ -1500,6 +1564,12 @@ class ActionBattle {
     const mp = this.motes.pos;
     for (let i = 0; i < this.motes.n; i++) if (mp[i * 3 + 1] > 7.5) mp[i * 3 + 1] = 0.05;
     this.props.forEach(p => { p.obj.position.y = p.y + Math.sin(this.time * 0.8 + p.ph) * (p.amp || 0.15); if (p.spin) p.obj.rotation.y += p.spin * raw; });
+    if (this.arenaSignals && SAVE.settings.flashes !== false && SAVE.settings.gfx !== 'low') {
+      for (let i = 0; i < this.arenaSignals.length; i++) {
+        const p = this.arenaSignals[i];
+        p.mat.color.copy(p.base).multiplyScalar(0.86 + Math.sin(this.time * 1.8 + p.phase) * 0.14);
+      }
+    }
     if (this.clouds) this.clouds.rotation.y += raw * 0.012;
     if (this.bloom && this.bloom.strength > 0.55) this.bloom.strength = Math.max(0.55, this.bloom.strength - raw * 0.45);
     // Ring under the leader; the reticle sits under whatever she is attacking.
