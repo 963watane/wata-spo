@@ -1,0 +1,99 @@
+/* Presentation pass: shared surfaces, readable dialogue and broadcast reveals. */
+:root { --motion-ui: 200ms; --surface-ui: rgba(10, 15, 32, .9); }
+:is(.home, .rc, .ch, .tm) button { transition: transform var(--motion-ui) ease-out, background-color var(--motion-ui) ease-out, border-color var(--motion-ui) ease-out; }
+:is(.home, .rc, .ch, .tm, .story, .results) button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 4px; }
+:is(.home, .rc, .ch, .tm) button:active:not(:disabled) { translate: 0 2px; }
+.home-continue { border: 1px solid rgba(255,255,255,.3); border-left: 4px solid var(--c); background: linear-gradient(110deg, var(--surface-ui), rgba(10,15,32,.7)); }
+.home-continue em { letter-spacing: 2px; }
+.home-continue b { line-height: 1.4; }
+.home-menu .tile { border: 1px solid rgba(255,255,255,.24); box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+.home-dock { border-top: 1px solid rgba(255,255,255,.22); background: linear-gradient(180deg, rgba(8,12,28,.7), #080c1c); }
+.dock-btn b { letter-spacing: .6px; }
+.hl-btn { border: 1px solid rgba(255,255,255,.2); }
+.rc-pulls { gap: 10px; }
+.rc-pulls button { min-height: 48px; }
+.rc-pity { padding: 10px 14px; border-left: 2px solid var(--c, var(--hi)); background: var(--surface-ui); }
+.ch-tabbar button { min-height: 42px; }
+.ch-face.sel { outline: 2px solid var(--c); outline-offset: 3px; }
+.tm-actions { gap: 12px; }
+.tm-actions .pill { min-height: 44px; }
+.tm-stage { border-left: 3px solid var(--cyan); background: linear-gradient(90deg, var(--surface-ui), rgba(10,15,32,.4)); }
+.tm-stage > span { line-height: 1.6; }
+.tm-card-name { text-shadow: 0 2px 4px #000; }
+.tm-tabs button.sel { box-shadow: inset 0 -3px var(--cyan); }
+@media (hover: hover) {
+  :is(.home-continue, .home-menu .tile, .hl-btn, .tm-actions .pill):hover:not(:disabled) { border-color: var(--cyan); }
+}
+
+/* Incoming broadcast: colour and shape build up with the already-rolled rarity. */
+.pull-signal { position: absolute; z-index: 3; top: 12%; left: 50%; width: min(420px, 84vw); transform: translateX(-50%); text-align: center; color: #eaf0ff; }
+.pull-signal > span { font: 700 10px var(--font); letter-spacing: 4px; }
+.pull-signal > div { display: flex; align-items: center; justify-content: center; gap: 7px; height: 64px; margin: 18px 0; }
+.pull-signal i { width: 8px; height: 24%; background: var(--mc); box-shadow: 0 0 12px var(--mc); animation: signalRise .7s ease-in-out infinite alternate; }
+.pull-signal i:nth-child(2n) { height: 60%; animation-delay: -.3s; }
+.pull-signal i:nth-child(3n) { height: 85%; animation-delay: -.5s; }
+.pull-signal i:nth-child(4) { height: 100%; }
+.pull-signal b { display: block; padding: 10px 14px; border-top: 1px solid var(--mc); border-bottom: 1px solid var(--mc); font: 700 14px var(--font); letter-spacing: 3px; background: rgba(5,8,22,.65); }
+@keyframes signalRise { from { scale: 1 .35; opacity: .5; } to { scale: 1 1; opacity: 1; } }
+.pull-scene.t5 .pull-signal { color: #ffe8a6; }
+.results-title { letter-spacing: 1px; }
+.rcard.open .rcard-front { box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
+.splash-info { padding: 20px 24px; border-left: 3px solid var(--c); background: linear-gradient(90deg, rgba(6,10,26,.94), rgba(6,10,26,.55) 75%, transparent); max-width: 65%; }
+.splash-info h2 { font-size: clamp(28px, 4vw, 60px); line-height: 1.15; }
+.splash-info .splash-quote { display: block; max-width: 42ch; line-height: 1.6; }
+.rw-head { padding: 0 20px; text-align: center; }
+.rw-tile { border-radius: 5px 16px 5px 5px; border: 1px solid var(--rc); }
+.rw-n { font-variant-numeric: tabular-nums; }
+.rw-name { line-height: 1.5; color: #e7eafa; }
+.rw .rw-tap { opacity: 1; padding: 12px 26px; border: 1px solid rgba(255,255,255,.3); border-radius: 4px; background: #11182b; color: #fff; cursor: pointer; min-height: 44px; }
+.rw.ready .rw-tap { border-color: var(--hi); color: var(--hi); animation: none; }
+.rw-tap:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+
+/* The name plate extends outside the box; clipping it hides the speaker. */
+.story-box { clip-path: none; border: 1px solid rgba(255,255,255,.18); border-radius: 4px 4px 16px 4px !important; padding-bottom: 32px; }
+.story-text { line-height: 1.75; text-wrap: pretty; }
+.story-name { max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.story-progress { position: absolute; z-index: 5; bottom: 12px; left: 50%; transform: translateX(-50%); width: min(980px, 92vw); height: 2px; background: rgba(255,255,255,.12); pointer-events: none; }
+.story-progress i { display: block; height: 100%; background: var(--cyan); transition: width 220ms ease-out; }
+.story-progress span { position: absolute; right: 0; bottom: 4px; font: 700 9px var(--font); letter-spacing: 2px; color: #e3eeff; font-variant-numeric: tabular-nums; }
+.story.intro .story-progress { opacity: 0; }
+.story-slot { transition: filter 220ms ease-out, opacity 220ms ease-out; }
+.ab-cut .abc-name { border-left: 4px solid var(--c); padding: 12px 24px; background: linear-gradient(90deg, rgba(7,10,26,.95), rgba(7,10,26,.45), transparent); }
+.ab-cut .abc-name em { letter-spacing: 4px; }
+.ab-banner.perfect b { border-top: 1px solid #9fe8ff; border-bottom: 1px solid #9fe8ff; padding-top: 12px; padding-bottom: 12px; }
+
+/* Quiet settings retain the reveal and information without white-outs or pulsing. */
+.visual-calm :is(.flash, .pt-shine, .rw-shine, .rw-sparks), .visual-calm .pt-scene.launch::after { display: none; }
+.visual-calm :is(.pt-ticket, .pt-ring, .pt-hint, .rw-rays, .rw-glow, .rw-burst, .pull-signal i, .pull-scene.t5.bump) { animation: none; }
+.visual-calm .pt-scene.launch .pt-ticket { animation: none; opacity: 0; transition: opacity 200ms; }
+.visual-calm .story-bg, .visual-calm .story-scene { animation: none; }
+@media (max-width: 600px) {
+  .splash-info { left: 4%; bottom: 12%; max-width: 92%; padding: 14px 16px; }
+  .splash-info h2 { font-size: 28px; }
+  .pull-signal { top: 10%; }
+  .pull-signal > span, .pull-signal b { letter-spacing: 2px; }
+  .story-box { width: 94vw; padding: 24px 18px 28px; max-height: 35vh; }
+  .story-text { font-size: 15px; max-height: 25vh; overflow-y: auto; }
+  .story-title { max-width: 45%; font-size: 11px; }
+  .story-ctrl { gap: 3px; right: 8px; }
+  .story-ctrl button { padding: 8px; }
+  .story-ctrl button .ic { display: none; }
+  .rc-pity { min-width: 0; }
+  .tm-actions { flex-wrap: wrap; }
+}
+@media (max-height: 520px) {
+  .pull-signal { top: 6%; }
+  .pull-signal > div { height: 32px; margin: 8px 0; }
+  .story-box { min-height: 100px; padding: 22px 24px 18px; }
+  .story-text { font-size: 14px; max-height: 20vh; overflow-y: auto; }
+  .splash-info { padding: 10px 16px; }
+  .rw { gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.home, .rc, .ch, .tm) button, .story-progress i { transition: none; }
+  .pull-signal i, .pt-ticket, .pt-ring, .pt-hint, .rw-rays, .rw-glow, .rw-burst, .story-scene, .story-bg, .pull-scene.t5.bump { animation: none; }
+  .pt-scene.launch::after, .pt-shine, .rw-shine, .rw-sparks, .pull-scene .flash { display: none; }
+  .pt-scene.launch .pt-ticket { animation: none; opacity: 0; }
+  .rcard-inner { transition-duration: 1ms; }
+  .rw-card.in { animation: none; opacity: 1; transform: none; }
+}
