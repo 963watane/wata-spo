@@ -2941,9 +2941,11 @@ class ActionBattle {
     if (Math.hypot(dx, dz) > .05) {
       h.pos.x += dx * ACT.speed * dt; h.pos.z += dz * ACT.speed * dt;
       if (h.pos.z >= -13) {
-        h.pos.x = Math.max(-14, Math.min(14, h.pos.x)); h.pos.z = Math.min(14, h.pos.z); h.pos.y = 0;
+        h.pos.x = Math.max(-11.2, Math.min(11.2, h.pos.x)); h.pos.z = Math.min(12, h.pos.z); h.pos.y = 0;
+        // The raised gallery has one open gate; its wings are scenery, not walkable floor.
+        if (Math.abs(h.pos.x) > 2.2) h.pos.z = Math.max(-11.2, h.pos.z);
       } else {
-        const q = SpoExpedition.project(h.pos.x, h.pos.z, this.routeProjection), radius = 2.2;
+        const q = SpoExpedition.project(h.pos.x, h.pos.z, this.routeProjection), radius = 1.85;
         if (q.distance > radius) {
           const k = radius / q.distance; h.pos.x = q.x + (h.pos.x - q.x) * k; h.pos.z = q.z + (h.pos.z - q.z) * k;
         }

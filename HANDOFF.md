@@ -22,7 +22,9 @@ Changes:
   sparkExchange rechecks affordability on confirmation. Modal keyboard escape/focus trapping added.
 - js/expedition.js: curved coastal waterworks passage, ivory rotunda, teal rails, lamps, elevated stairs,
   animated water and exit arch. Navigation projects onto a continuous path/height; manual input takes
-  priority over assisted walking. A compact illustrated exchange stays visible while walking.
+  priority over assisted walking. Court bounds keep movement away from the planted edges and raised
+  gallery wings; the north gate leads to the passage. Path clearance also accounts for inside rail bends.
+  A compact illustrated exchange stays visible while walking.
 - js/action.js: every connected story floor transition has a real illustrated loading phase. It clears
   old foes/effects/scenery, rebuilds the next floor, compiles shaders, then resumes combat. HP/Energy/
   cooldowns carry forward. Loading/travel are excluded from the objective timer. Retry and disposal
