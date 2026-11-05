@@ -4,6 +4,65 @@ Shared notes between the AI assistants working on this repo (ChatGPT and Claude)
 Before starting: pull the latest `main`, then read this file and `AGENTS.md`.
 When you stop: add an entry here and push.
 
+## 2026-11-05 · Codex · Cinematic game interface and walkable floor passages
+
+The owner rejected the framed paper/sage dashboard and supplied visual references for a full game UI,
+layered combat and architectural traversal between floors. This pass supersedes that menu treatment.
+All compositions, procedural architecture and constellation graphics are original. Existing owner art,
+story lines, credits, three.js r160, save key and ACTION_KITS/ACT tuning remain intact.
+
+Changes:
+- cinema.css, js/ui.js, both HTML: full-screen illustrated lobby with floating serif navigation,
+  chapter action and banner strip; illustrated recruit stage; constellation ticket/reveal/results;
+  dark member/squad menus, chapter world path, Tower/Ranked/Boost/reward/settlement surfaces.
+  The SVG constellation backdrop is original code-authored art at assets/ui/constellations.svg (7.7 KB).
+  studio.css default selector specificity is lowered with :where so the new presentation can override it.
+- Recruitment rates show the actual base probabilities per result, with explicit pity exceptions.
+  Spark exchange previews the exact featured result and cost before spending; the existing atomic
+  sparkExchange rechecks affordability on confirmation. Modal keyboard escape/focus trapping added.
+- js/expedition.js: curved coastal waterworks passage, ivory rotunda, teal rails, lamps, elevated stairs,
+  animated water and exit arch. Navigation projects onto a continuous path/height; manual input takes
+  priority over assisted walking. A compact illustrated exchange stays visible while walking.
+- js/action.js: every connected story floor transition has a real illustrated loading phase. It clears
+  old foes/effects/scenery, rebuilds the next floor, compiles shaders, then resumes combat. HP/Energy/
+  cooldowns carry forward. Loading/travel are excluded from the objective timer. Retry and disposal
+  guards prevent duplicate or late wave starts. Standalone Tower/other stage entries also show loading.
+- js/environment.js: open colonnades and raised galleries frame combat; different floor inlays and trim
+  distinguish successive encounters. Inlays share three small cached alpha textures rather than copying
+  full floor maps. Painted scenery textures preload behind the loading screen. Geometry remains cached.
+- js/combat-art.js: bounded layered waves, crescents, light spires and lance ribbons wrap larger existing
+  casts. High/Low budgets, flash-off normal blending, cached geometry and effect material cleanup.
+  Light contact effects and all original damage/range/hit schedules are preserved.
+- Isometric camera and screen-relative manual controls; compact circular skill cluster and remaining-
+  targets floor objective. Illustrated settlement identifies the actual highest-damage MVP.
+- js/help.js and PLAYING.md describe the new passage and loading flow.
+
+Verified in this pass:
+- Shared scripts compile together; both HTML script/style lists match. 16 node regression checks pass:
+  save migration, exact-cost atomic training, tactic gates, clocks, route projection/heights and
+  screen-relative manual input. Existing save key unchanged.
+- 54/54 headless campaign runs won at recommended levels (18 stages, seeds 17/42/93).
+- Actual rendered Lv3 Tsuna/Sendo/Noah 1-2 run cleared both floors via Auto, including the passage and
+  loading screen: 27 seconds, 1194/1204 HP, three stars and Spotlight unlock. This was not a forced win.
+- Held the real shader-compile loading boundary to inspect the illustrated Floor 2 screen. On release,
+  Floor 2 resumed with the same HP/Energy. Separate intentional compilation-failure audit passed retry,
+  exact floor index, carried resources, single scenery root and disposal-before-resume guards.
+  The intentionally injected QA compilation error is expected in that audit's console only.
+- Four High/Low × flashes on/off layered-effect budget/beam-length/scene-cleanup cases passed.
+  Real recruit ticket, ten-card lineup, rare illustration, keyboard continuation and rates table checked.
+  Lobby, chapter route, members, squad/tactics, Tower and illustrated victory/defeat rendered.
+- Local frame samples: High approximately 137 fps, Low 144 fps, p95 7.1 ms. These describe this computer,
+  not certification on all mid-range hardware. Phone landscape layout checked at 844×390.
+- No QA server or injected test controls are shipped in the repository.
+
+Remaining limits:
+- Simplified shared member rig/recolours and existing boss/Echo art remain; commercial bespoke character
+  models, a full animation studio and licensed music are outside this prototype's assets. No claim of
+  commercial-game parity. The environment and interface are substantially reworked.
+- No complete manual campaign or physical touch-device certification. OS reduced-motion preference was
+  not emulated; matching CSS and in-game Low/flash/shake/cut-in branches remain present.
+- Publication/source archive status is recorded in the release follow-up once verified.
+
 ## 2026-11-04 · Codex · Studio redesign and connected story areas
 
 The owner requested a complete original redesign inspired by the polish of an anime action RPG,

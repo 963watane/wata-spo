@@ -33,8 +33,8 @@ const HELP = {
       <p>Bosses change phase at half HP and again at a quarter, with new attacks. Watch the name under the boss bar: <b>!!</b> means a charged attack. Break the boss to cancel it, or get out of the zone.</p>
       <h4>${ic('star')} Stars</h4>
       <p>Clear the stage, finish with at least half your HP, and beat the time target shown under the clock.</p>
-      <h4>${ic('map')} Connected story areas</h4>
-      <p>After clearing an area, follow the path forward with WASD or the left stick. The Continue button or <kbd>Enter</kbd> starts assisted walking; manual movement takes priority. Auto also walks between areas. Travel and closing dialogue do not count toward the time objective.</p>
+      <h4>${ic('map')} Between-floor passages</h4>
+      <p>After clearing a floor, explore the passage with WASD or the left stick. Follow the stairs to the exit arch. The Next floor button or <kbd>Enter</kbd> starts assisted walking; manual movement takes priority. Auto walks too. An illustrated loading screen prepares each next floor. HP, Energy and cooldowns carry forward; travel, loading and closing dialogue do not count toward the time objective.</p>
       <h4>${ic('auto')} Auto</h4>
       <p><kbd>F</kbd> or the AUTO button lets the leader fight on her own. Auto is decent, but it reacts late and misses some warnings.</p>
       <h4>${ic('info')} Statuses</h4>
