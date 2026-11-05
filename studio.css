@@ -727,3 +727,35 @@
 .ab .end-box .tips p { color: #6b7f60; font-weight: 400; }
 .ab .end-box .tips p b { color: #60784a; }
 .ab .ab-ctrl .auto.on { background: #55784e; color: #f7faee; border-color: #55784e; }
+.ab .end-box .rewards { background: #ecebd8; border-color: #d4d9bd; color: #8a8256; }
+.ab .end-box .rewards :is(.gem,.tok,.xp,.first) { color: #8c8558; text-shadow: none; font-weight: 500; }
+.ab .end-box .obj em { color: #7c925e; background: #e1eacd; border-radius: 3px; font-weight: 500; }
+.ab .end-box .obj.ok { color: #648153; }
+.ab .end-box .obj.ok > span { color: #a48d4f; }
+.ab .bp .bp-head em { color: #8a9f73; font-weight: 500; letter-spacing: 2px; }
+.ab .bp .bp-lv em { color: #9b8959; }
+.ab .bp .bp-ico { filter: none; }
+.ab .bp .bp-foot { color: #859669; }
+.ab .bp .pill { clip-path: none; border-radius: 5px; background: #dfe9d5; border: 1px solid #bfd0af; color: #5c794f; font: 500 12px 'Exo 2',sans-serif; text-transform: none; box-shadow: none; }
+.tw-info::before { background: linear-gradient(90deg,#edf2e2e8,#edf2e233 65%); }
+.tw-info-inner { color: #4c6b45; background: #f7faeeea; height: auto; margin: 6% 4%; padding: 27px; max-width: 410px; border: 1px solid #cddbc1; border-radius: 9px; }
+.tw-info h2 { font: 400 clamp(60px,9vw,110px)/.9 'Exo 2',sans-serif; letter-spacing: -3px; color: #587c4d; }
+.tw-info h2 small { color: #9cac8b; font-weight: 400; }
+.tw-info :is(.tw-meta,.tw-rew) { color: #82936d; font-size: 12px; font-weight: 400; }
+.tw-info .tw-foe span { color: #688258; }
+.tw-info p { font-weight: 500; }
+.tw-info em { color: #90a475; font-size: 10px; font-weight: 500; }
+.tw-list .tw-floor.locked { opacity: .75; }
+@media (max-height: 520px) { .tw-info-inner { margin: 15px; padding: 15px; gap: 6px; max-width: 350px; } .tw-info h2 { font-size: 52px; } .tw-info p { font-size: 16px; } }
+#live .rd-boss { background: #244248; box-shadow: none; border: 1px solid #56736c; }
+#live .rd-info { color: #edf2e3; }
+#live .rd-info em { color: #b1c49c; font-weight: 500; letter-spacing: 1.5px; }
+#live .rd-info h2 { font-weight: 400; }
+#live .rd-info p { color: #c6d4c4; font: 400 12px/1.7 'Exo 2',sans-serif; }
+#live .rd-art img { filter: drop-shadow(0 10px 24px #0c242c66); }
+#live .rd-mods div { background: #1e393e; box-shadow: inset 2px 0 #9eb787; border-radius: 4px; padding: 8px 10px; }
+#live .rd-mods b { color: #b9cda2; font-weight: 500; font-size: 10px; }
+#live .rd-mods span { color: #b8cabb; font-weight: 400; }
+#live .rd-best :is(small,span),#live .rd-weak span { color: #b3c7ac; }
+#live .rd-tiers :is(.gem,.coin,.tok) { color: #7d8b67; }
+#live .rd-go { border-color: #b9cfa9; background: #d4e3c9; color: #355844; }

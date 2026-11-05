@@ -12,7 +12,7 @@ RENDER.tower = () => {
   $('#tower').innerHTML = `
     ${topbar('Stream Tower')}
     <div class="tw">
-      <div class="tw-info" style="${sceneStyle(towerBg(towerSel))}">
+      <div class="tw-info" style="${SpoEnvironment.storyStyle(towerBg(towerSel))}">
         <div class="tw-info-inner">
           <em>${st.boss ? 'BOSS FLOOR' : 'FLOOR'}</em>
           <h2>${towerSel}<small>/${TOWER_FLOORS}</small></h2>
