@@ -581,13 +581,16 @@ function doRecruit(bid, n) {
 function openModal(html) {
   const ov = $('#pull'), previousFocus = document.activeElement;
   ov.className = 'overlay show';
-  ov.innerHTML = `<div class="picker"><div class="picker-box" role="dialog" aria-modal="true" aria-label="Recruit information">${html}</div></div>`;
+  ov.innerHTML = `<div class="picker"><div class="picker-box" role="dialog" aria-modal="true">${html}</div></div>`;
+  const box = ov.querySelector('.picker-box'), heading = box.querySelector('h2,h3');
+  if (heading) { heading.id = heading.id || 'spo-modal-title'; box.setAttribute('aria-labelledby', heading.id); }
+  else box.setAttribute('aria-label', 'Game information');
   const close = () => { ov.className = 'overlay'; ov.innerHTML = ''; ov.onkeydown = null; previousFocus?.focus(); };
   ov.querySelector('.picker').onclick = e => { if (e.target.classList.contains('picker') || e.target.closest('.close')) close(); };
   ov.onkeydown = e => {
     if (e.key === 'Escape') { e.stopPropagation(); close(); }
     if (e.key === 'Tab') {
-      const items = [...ov.querySelectorAll('button:not(:disabled),a[href],select')];
+      const items = [...ov.querySelectorAll('button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled):not([type=hidden]),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])')].filter(el => el.getClientRects().length);
       if (!items.length) return;
       if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items[items.length - 1].focus(); }
       else if (!e.shiftKey && document.activeElement === items[items.length - 1]) { e.preventDefault(); items[0].focus(); }
