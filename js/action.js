@@ -568,18 +568,34 @@ class ActionFx {
   }
   // dir: which way the blow travels, so sparks spray out the far side.
   hit(p, color, big = false, dir = null) {
-    this.glow(p.x, p.y, p.z, color, big ? 1.3 : 0.9, big ? 0.16 : 0.1, { shrink: true, bright: big ? 2 : 2.2 });
-    this.b.streaks.emit(p.x, p.y, p.z, { n: big ? 14 : 7, speed: big ? 13 : 9, color, life: big ? 0.32 : 0.24, width: big ? 0.09 : 0.06, dir: dir || undefined, spread: 0.8, grav: 6 });
-    this.b.streaks.emit(p.x, p.y, p.z, { n: big ? 5 : 2, speed: big ? 10 : 7, color: '#ffffff', life: 0.2, width: 0.05, dir: dir || undefined, spread: 0.5, grav: 4 });
-    if (big) { this.impact(p, color, 2.2); this.b.stars.emit(p.x, p.y, p.z, { n: 3, speed: 3.5, color: '#fff6c8', life: 0.4, size: 0.45, grav: 0 }); }
+    const low = SAVE.settings.gfx === 'low', quiet = SAVE.settings.flashes === false;
+    if (!this.budget('hit', low ? 3 : 6)) return;
+    this.impact(p, color, big ? 2.5 : 1.1, big);
+    this.b.streaks.emit(p.x, p.y, p.z, { n: low ? 3 : big ? 11 : 5, speed: big ? 13 : 9, color, life: big ? 0.3 : 0.18, width: big ? 0.09 : 0.05, dir: dir || undefined, spread: 0.65, grav: 6, bright: quiet ? 0.8 : 1.6 });
+    if (!low && !quiet) this.b.streaks.emit(p.x, p.y, p.z, { n: big ? 3 : 1, speed: 10, color: '#ffffff', life: 0.12, width: 0.04, dir: dir || undefined, spread: 0.4, grav: 4 });
   }
-  // A sharp radial burst sprite for crits, finishers and Breaks.
-  impact(p, color, size = 2.4) {
-    if (!this.budget('impact', 3)) return null;
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: burstTex(), color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.45).multiplyScalar(2.2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, rotation: Math.random() * 6.28 }));
-    s.position.set(p.x, p.y, p.z);
-    return this.add(s, 0.16, k => { const sc = size * (0.35 + 0.85 * Math.sqrt(k)); s.scale.set(sc, sc, 1); s.material.opacity = 1 - k * k; }, () => s.material.dispose());
+  // Crisp ink-like contact marks expand once, then release; no full-screen flash.
+  impact(p, color, size = 2.4, heavy = true) {
+    if (!this.budget('impact', SAVE.settings.gfx === 'low' ? 3 : 6)) return null;
+    const quiet = SAVE.settings.flashes === false;
+    const map = canvasTex(heavy ? 'impactHeavy' : 'impactLight', 128, 128, g => {
+      g.translate(64, 64); g.fillStyle = '#ffffff';
+      for (let i = 0; i < (heavy ? 8 : 4); i++) {
+        g.rotate(Math.PI / (heavy ? 4 : 2));
+        const r = i % 2 ? 35 : 59;
+        g.beginPath(); g.moveTo(7, 0); g.lineTo(16, heavy ? 7 : 4);
+        g.lineTo(r, 0); g.lineTo(16, heavy ? -7 : -4); g.closePath(); g.fill();
+      }
+    });
+    const mat = new THREE.SpriteMaterial({ map, color, transparent: true, depthWrite: false,
+      blending: quiet ? THREE.NormalBlending : THREE.AdditiveBlending, rotation: heavy ? Math.PI / 8 : Math.PI / 4 });
+    const mark = new THREE.Sprite(mat); mark.position.copy(p);
+    return this.add(mark, heavy ? 0.24 : 0.14, k => {
+      const sc = size * (0.55 + 0.6 * Math.min(1, k * 4));
+      mark.scale.set(sc, sc, 1); mat.opacity = (quiet ? 0.7 : 1) * (1 - k) * (1 - k);
+    }, () => mat.dispose());
   }
+
   // A glowing magic circle on the ground that spins open and fades.
   circle(x, z, r, color, dur = 0.9) {
     const m = new THREE.Mesh(geo('fxCircle', () => new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2)), this.basic(color, { map: circleTex(), bright: 1.9 }));
@@ -1732,9 +1748,9 @@ class ActionBattle {
     this.slow(0.3, 0.9);
     this.addEnergy(ACT.energyPerfect);
     h.skillCd = Math.max(0, h.skillCd - 2);
-    this.banner('PERFECT DODGE', 'perfect');
+    this.combatCue('perfect', 'PERFECT DODGE', 'ENERGY UP · SKILL COOLDOWN −2s', '#9fe8ff');
     this.fx.flatRing(h.pos.x, h.pos.z, '#9fe8ff', 0.4, 4, 0.6);
-    this.stars.emit(h.pos.x, 0.8, h.pos.z, { n: 14, speed: 3, color: '#bff4ff', life: 0.9, size: 0.5, grav: 0, up: 0.6 });
+    this.stars.emit(h.pos.x, 0.8, h.pos.z, { n: SAVE.settings.gfx === 'low' ? 4 : 10, speed: 3, color: '#bff4ff', life: 0.9, size: 0.5, grav: 0, up: 0.6 });
     this.snd('crit');
     if (this.perks.perfectBlast) this.after(0.05, () => { this.fx.nova(h.pos.x, h.pos.z, 3.2, '#9fe8ff'); this.hitCircle(h, h.pos.x, h.pos.z, 3.2, 1.5 * this.perks.perfectBlast, { kind: 'follow' }); });
   }
@@ -2232,11 +2248,11 @@ class ActionBattle {
     this.slow(0.25, 0.32);
     this.fx.shake(0.35);
     this.punch = Math.max(this.punch, 0.8);
-    this.fx.flatRing(e.pos.x, e.pos.z, '#ffffff', 0.5, e.boss ? 6 : 3.5, 0.5);
+    this.fx.flatRing(e.pos.x, e.pos.z, src.def.color, 0.5, e.boss ? 6 : 3.5, 0.5, { bright: 1, alpha: 0.45 });
     this.fx.impact(new THREE.Vector3(e.pos.x, e.boss ? 2 : 0.9, e.pos.z), bfx ? ELEMENTS[src.def.element].color : '#ffffff', e.boss ? 7 : 4.2);
-    this.streaks.emit(e.pos.x, 0.9, e.pos.z, { n: 26, speed: 16, color: bfx ? ELEMENTS[src.def.element].color : '#ffffff', life: 0.4, width: 0.1, grav: 5 });
-    this.stars.emit(e.pos.x, 0.9, e.pos.z, { n: 18, speed: 7, color: bfx ? ELEMENTS[src.def.element].color : '#ffffff', life: 0.8, size: 0.55, grav: 4 });
-    this.sparks.emit(e.pos.x, 0.9, e.pos.z, { n: 30, speed: 9, color: '#ffffff', life: 0.5, size: 0.2 });
+    this.streaks.emit(e.pos.x, 0.9, e.pos.z, { n: SAVE.settings.gfx === 'low' ? 6 : 16, speed: 16, color: bfx ? ELEMENTS[src.def.element].color : '#ffffff', life: 0.4, width: 0.1, grav: 5 });
+    this.stars.emit(e.pos.x, 0.9, e.pos.z, { n: SAVE.settings.gfx === 'low' ? 3 : 8, speed: 7, color: bfx ? ELEMENTS[src.def.element].color : '#ffffff', life: 0.8, size: 0.55, grav: 4 });
+    this.sparks.emit(e.pos.x, 0.9, e.pos.z, { n: SAVE.settings.gfx === 'low' ? 4 : 12, speed: 9, color: src.def.color, life: 0.3, size: 0.12, bright: 0.8 });
     this.breakSplash(e, bfx, src, wasCharge);
     this.coach('break');
   }
@@ -2893,6 +2909,8 @@ class ActionBattle {
     // Swing round in front of the leader and keep her on the left; results go on the right.
     this.camFocus = new THREE.Vector3(h.pos.x - 1.3, 0, h.pos.z);
     this.cam.to = { yaw: Math.PI * 0.92, dist: 4.4, h: 1.8 };
+    h.facing = Math.atan2(-1.3 + Math.sin(this.cam.to.yaw) * 4.4, Math.cos(this.cam.to.yaw) * 4.4);
+    this.syncModel(h);
     this.root.classList.add('scene', 'ended');
     sfx(win ? 'win' : 'lose');
     if (win && typeof playMusic === 'function') playMusic('victory');
@@ -2951,12 +2969,17 @@ class ActionBattle {
     const end = this.q('.end');
     end.classList.add('ab-end');
     end.innerHTML = `
-      <div class="abe-quote" style="--c:${h.def.color}"><em>${win ? 'MVP · ' : ''}${h.def.short}</em>${voice(h.id, win ? 'victory' : 'ko')}</div>
-      <div class="end-box ${win ? 'win' : 'lose'}">
-        <h1>${st.raid ? 'RAID OVER' : win ? 'VICTORY' : 'DEFEAT'}</h1>
+      <div class="abe-quote" style="--c:${h.def.color}"><em>${win ? 'LEADER · ' : ''}${h.def.short}</em>${voice(h.id, win ? 'victory' : 'ko')}</div>
+      <div class="end-box ${win ? 'win' : 'lose'}" role="dialog" aria-modal="true" aria-labelledby="abe-title">
+        <div class="abe-kicker">${st.raid ? 'RANKED RAID' : win ? 'STREAM COMPLETE' : 'STREAM ENDED'}<span>${st.id || ''}</span></div>
+        <h1 id="abe-title">${st.raid ? 'RAID OVER' : win ? 'VICTORY' : 'DEFEAT'}</h1>
+        <div class="abe-stage">${st.name}</div>
+        <div class="abe-scroll">
         <div class="abe-stats"><span>${ic('timer')} ${fmtClock(secs)}</span><span>${this.stat.maxCombo} max combo</span><span>${this.stat.breaks} breaks</span>${this.stat.perfect ? `<span>${this.stat.perfect} perfect dodges</span>` : ''}</div>
         ${rewardHtml}
-        <div class="dmg-chart">${units.map(u => `<div><span>${u.def.short}</span><i style="width:${Math.max(2, (u.dmg || 0) / top * 100)}%;background:${u.def.color}"></i><b>${(u.dmg || 0).toLocaleString()}</b></div>`).join('')}</div>
+        <div class="abe-section">SQUAD DAMAGE <span>${Math.round(units.reduce((n, u) => n + (u.dmg || 0), 0)).toLocaleString()} TOTAL</span></div>
+        <div class="abe-damage">${units.map(u => `<div class="abe-unit" style="--unit:${u.def.color}"><div class="face" style="${faceStyle(u.id)}"></div><div><span>${u.def.short}</span><b>${Math.round(u.dmg || 0).toLocaleString()}</b><i><em style="width:${(u.dmg || 0) / top * 100}%"></em></i></div></div>`).join('')}</div>
+        </div>
         <div class="end-btns"><button class="btn retry">Retry</button><button class="btn ${win && nextStageOf(st) ? '' : 'primary'} back">Continue</button>
           ${win && nextStageOf(st) ? `<button class="btn primary next">Next ${ic('play')}</button>` : ''}</div>
       </div>`;
@@ -2965,6 +2988,7 @@ class ActionBattle {
     end.querySelector('.back').onclick = () => this.exit('back');
     const nx = end.querySelector('.next');
     if (nx) nx.onclick = () => this.exit('next');
+    (nx || end.querySelector('.back')).focus({ preventScroll: true });
   }
 
   defeatTips() {
@@ -3217,14 +3241,33 @@ class ActionBattle {
     this.bannerT = setTimeout(() => b.classList.remove('show'), cls === 'finish' ? 1400 : 1300);
   }
 
+  combatCue(kind, title, detail, color) {
+    if (this.headless) return;
+    // One cue at a time keeps simultaneous Breaks from hiding the arena.
+    this.root.querySelector('.ab-combat-cue')?.remove();
+    const cue = document.createElement('div');
+    cue.className = 'ab-combat-cue ' + kind;
+    cue.style.setProperty('--cue', color);
+    cue.innerHTML = '<i></i><div><b></b><span></span></div><i></i>';
+    cue.querySelector('b').textContent = title;
+    cue.querySelector('span').textContent = detail;
+    this.root.appendChild(cue);
+    setTimeout(() => cue.remove(), 1100);
+  }
+
   breakSplash(e, bfx, src, charge) {
+    if (this.headless) return;
+    if (e.boss || charge) this.combatCue('break', charge ? 'CHARGE CANCELLED' : 'BOSS BREAK', 'OPENING CREATED', src.def.color);
+    const layer = this.q('.ab-labels');
+    if (layer.querySelectorAll('.ab-break').length >= 3) layer.querySelector('.ab-break').remove();
     const el = document.createElement('div');
     el.className = 'ab-break';
     el.style.setProperty('--c', ELEMENTS[src.def.element] ? ELEMENTS[src.def.element].color : '#fff');
     el.innerHTML = `<b>BREAK</b><span>${bfx ? `${elIc(src.def.element)} ${bfx.name}` : ''}${charge ? ' · CHARGE CANCELLED' : ''}</span>`;
     const [x, y] = this.screenPos(e, e.boss ? 2.4 : 1.2);
-    el.style.left = x + 'px'; el.style.top = y + 'px';
-    this.q('.ab-labels').appendChild(el);
+    el.style.left = Math.max(110, Math.min(this.root.clientWidth - 110, x)) + 'px';
+    el.style.top = Math.max(110, y) + 'px';
+    layer.appendChild(el);
     setTimeout(() => el.remove(), 1200);
   }
 
