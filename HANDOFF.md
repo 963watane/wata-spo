@@ -4,6 +4,43 @@ Shared notes between the AI assistants working on this repo (ChatGPT and Claude)
 Before starting: pull the latest `main`, then read this file and `AGENTS.md`.
 When you stop: add an entry here and push.
 
+## 2026-11-04 · Codex
+
+Visual pass completed locally on main, based on 0715cf5. Publishing is currently blocked:
+the GitHub connector returned 403 for writes and local Git network access was not granted
+on the final continuation. These commits and the combined ZIP/patch supersede the earlier HUD-only patch.
+
+Changes:
+- action.css and js/action.js: clearer HP/shield, cooldown and readiness states; member-colour
+  skill/Ultimate emblems, bounded shards, labelled cut-ins and quieter flash-off presentation.
+- js/action.js: procedural rooftop equipment, alley signs, tunnel rails/lights, daytime banners
+  and sunset lanterns, gentle theme grading, fewer ambient particles on Low.
+- js/foes3d.js: visible attack wind-up cues and poses; clearer sniper/clipper silhouettes.
+- visual.css (loaded by both HTML entrypoints): shared menu surfaces, focus/press states,
+  reveal/cut-in frames and phone-landscape spacing, including the compact squad summary.
+- js/ui.js: recruit signal builds with the existing rarity sequence; ticket launches by keyboard.
+- js/rewards.js: Reveal all/Continue is a real keyboard-accessible button.
+- js/story.js: reading progress, clearer dialogue framing and reduced-motion-aware entrances.
+  Illustrated story and text remain intact.
+
+Validation:
+- node --check passed for every touched JS file; git diff --check passed; entrypoint script/style lists match.
+- Browser checks: 48 member cast combinations (six members, Skill/Ultimate, High/Low, flashes on/off)
+  and 10 enemy warning/reset/cleanup cases passed. All six arena themes opened without console errors.
+- Fresh seeded stage 2-3 simulation (Tsuna/Hinano/Lisa at recommended level) exactly matched baseline:
+  win, time 49, hp 85, damage 36340; no combat tuning or save code changed.
+- Recruit ticket keyboard launch, rare reveal/confirmation, reward keyboard dismissal, members,
+  team and illustrated story checked. Phone layout checked at 844x390; portrait retains the existing
+  rotate-device screen. Final squad spacing checked on a fresh server to avoid stale CSS.
+- Credits, owner art, model assets and three.js version unchanged. No new image assets or dependencies.
+  Test controls/server are outside the repository and excluded from delivery.
+
+Limits / next:
+- No measured 60 fps certification or full campaign playthrough; benchmark on a mid-range laptop.
+- Existing rig elbow stretch, recoloured member models and old echo models remain as noted below.
+- Next visual work: tune hit/Break timing by playing full fights; review results and menu spacing
+  across more devices. Publish the local commits once GitHub write access is available.
+
 ## 2026-11-04 · Claude
 
 State: the same game as the online Version 21 (the claude.ai link).

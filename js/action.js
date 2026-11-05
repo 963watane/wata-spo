@@ -3414,4 +3414,3 @@ function simulateBattle(stage, team, opts = {}) {
   while (!b.over && b.time < (opts.maxTime || 400)) b.step(dt);
   return { won: !!b.won, time: Math.round(b.time), hp: Math.round(b.player.hp / b.player.maxHp * 100), dmg: Math.round(b.totalDmg || 0), stats: b.stat };
 }
-
