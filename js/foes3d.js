@@ -27,6 +27,15 @@ class FoeModel {
     this.float = 0.06;
     this.eyes = []; this.blinkT = 1 + Math.random() * 3;
     (FOE_BUILD[key] || FOE_BUILD.grunt).call(this);
+    // A solid overhead cue stays legible when ground warnings overlap.
+    const warningMat = new THREE.MeshBasicMaterial({ color: '#ff526b', transparent: true, opacity: 0.9, depthWrite: false });
+    this.mats.push(warningMat);
+    this.warning = new THREE.Group();
+    this.warning.position.y = this.def.boss ? 3.4 : 1.7;
+    const warningGeo = geo('foeWarningBar', () => new THREE.BoxGeometry(1, 1, 1));
+    const stem = new THREE.Mesh(warningGeo, warningMat), dot = new THREE.Mesh(warningGeo, warningMat);
+    stem.scale.set(0.1, 0.36, 0.1); dot.scale.setScalar(0.1); dot.position.y = -0.3;
+    this.warning.add(stem, dot); this.warning.visible = false; this.root.add(this.warning);
     this.root.traverse(m => { if (m.isMesh) m.frustumCulled = false; });
   }
   play(name, dur) { const def = FOE_ACTS[name]; if (def) this.action = { def, t: 0, dur: dur || def.dur }; }
@@ -50,7 +59,10 @@ class FoeModel {
     if (this.state === 'run') { tg.lean = 0.22; tg.y = Math.abs(Math.sin(t * 9)) * 0.08; }
     else if (this.state === 'stun') { tg.tilt = Math.sin(t * 7) * 0.32; tg.sq = 0.9; }
     else { tg.y = Math.sin(t * 2.6) * this.float; tg.sq = 1 + Math.sin(t * 2.6 + 1.2) * 0.035; }   // idle: bob and breathe
-    if (this.state === 'charge') { tg.sq = 0.86 + Math.sin(t * 30) * 0.03; }
+    if (this.state === 'charge') { tg.sq = 0.82; tg.lean = -0.22; }
+    const warning = this.state === 'charge' || this.state === 'windup';
+    this.warning.visible = warning;
+    if (warning) this.warning.scale.setScalar(1 + Math.min(1, (this.action ? this.action.t / this.action.dur : 1)) * 0.3);
     const a = this.action;
     if (a) {
       a.t += dt;
@@ -68,7 +80,7 @@ class FoeModel {
     r.position.set(0, c.y, c.lunge);
     r.rotation.set(c.lean, 0, c.tilt);
     r.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
-    if (this.state === 'charge' || this.state === 'windup') r.position.x = (Math.random() - 0.5) * 0.04;
+    if (warning && SAVE.settings.shake !== false) r.position.x = Math.sin(t * 24) * 0.018;
     this.spin.forEach(s => { s.obj.rotation[s.axis] += s.speed * dt; });
     this.pulse.forEach(p => { const k = 0.5 + 0.5 * Math.sin(t * p.f + (p.ph || 0)); p.obj.scale.setScalar(p.base * (1 + k * p.amp)); });
     this.sway.forEach(s => { s.obj.rotation[s.axis] = s.base + Math.sin(t * s.f + s.ph) * s.amp; });
@@ -83,7 +95,7 @@ class FoeModel {
       this.flashT = Math.max(0, this.flashT - dt);
       const k = this.flashT / (this.flashMax || 1);
       // A quick tint rather than a full white-out, so enemies stay readable under constant hits.
-      this.mats.forEach(m => { m.emissive.copy(m.userData.emissive0).lerp(this.flashColor, k * 0.65); m.emissiveIntensity = Math.max(m.userData.ei0, k * 0.7); });
+      this.mats.forEach(m => { if (!m.emissive) return; m.emissive.copy(m.userData.emissive0).lerp(this.flashColor, k * 0.65); m.emissiveIntensity = Math.max(m.userData.ei0, k * 0.7); });
       this.flashing = this.flashT > 0;
     }
   }
@@ -112,6 +124,7 @@ const FOE_BUILD = {
     this.eye(g, [0, 0.24, 0.32], [0.1, 0.1, 0.035], '#ff4d6d', 1.8);
     this.part(g, G.cyl(0.012, 0.012, 0.3, 6), '#cfd6e2', { p: [0, 0.62, 0], ink: false });
     const tip = this.eye(g, [0, 0.8, 0], 0.05, '#ff4d6d', 2.2);
+    [-1, 1].forEach(s => this.part(g, G.box(0.06, 0.5, 0.22), '#cfd6e2', { p: [s * 0.3, 0.42, -0.08], r: [0, 0, -s * 0.45] }));
     this.pulse.push({ obj: tip, base: 0.05, amp: 0.8, f: 8 });
     [-1, 1].forEach(s => this.part(g, G.sph(), body, { p: [s * 0.4, -0.02, 0.1], s: 0.08 }));
     this.float = 0.12;
@@ -176,6 +189,7 @@ const FOE_BUILD = {
     this.eye(g, [-0.12, 0.08, 0.36], [0.065, 0.065, 0.025], '#ffffff', 1.2);
     this.eye(g, [0.12, 0.08, 0.36], [0.065, 0.065, 0.025], '#ffffff', 1.2);
     const sc = this.group(g, [0.42, 0.05, 0.12], [0, 0, -0.4]);
+    sc.scale.setScalar(1.3);
     [-1, 1].forEach(s => {
       const blade = this.group(sc, [0, 0, 0], [0, 0, s * 0.3]);
       this.part(blade, G.box(0.05, 0.46, 0.015), '#dfe6f2', { p: [0, 0.2, 0] });
