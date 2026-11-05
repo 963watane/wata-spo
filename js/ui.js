@@ -693,7 +693,7 @@ function resultFront(res) {
 // Full-screen splash for a ★5 or a brand-new member/memory. Resolves on tap.
 function showSplash(ov, res) {
   const layer = document.createElement('div');
-  layer.className = 'splash-layer';
+  layer.className = 'splash-layer' + (SAVE.settings.flashes === false || SAVE.settings.gfx === 'low' ? ' visual-calm' : '');
   if (res.type === 'memory') {
     const m = MEMORIES[res.id];
     const col = m.owner ? CHARACTERS[m.owner].color : '#b77cff';
@@ -725,7 +725,7 @@ function pullTicket(ov, results, bid, n) {
     const tier = `t${best}`;
     ov.innerHTML = `<div class="pt-scene" style="--c:${info.color}">
       <div class="pt-bg"></div><div class="pt-beam"></div><div class="pt-ring"></div>
-      <div class="pt-ticket"><div class="pt-holo" style="${art}"></div>
+      <div class="pt-ticket" role="button" tabindex="0" aria-label="Launch stream ticket"><div class="pt-holo" style="${art}"></div>
         <div class="pt-face"><em>STREAM TICKET</em><b>×${Math.max(1, results.length)}</b><small>${b.name}</small></div><i class="pt-shine"></i></div>
       <div class="pt-hint"><b>Swipe up to go live</b><span>or tap the ticket</span></div>
       <button class="pt-skip">Skip ${ic('next')}</button></div>`;
@@ -763,6 +763,7 @@ function pullTicket(ov, results, bid, n) {
     };
     t.addEventListener('pointerup', up);
     t.addEventListener('pointercancel', up);
+    t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); launch(); } });
     scene.querySelector('.pt-skip').onclick = e => { e.stopPropagation(); if (!done) { done = true; resolve('skip'); } };
   });
 }
@@ -771,10 +772,11 @@ function pullTicket(ov, results, bid, n) {
 async function playPull(results, bid, n, onClose = null) {
   const ov = $('#pull');
   const best = Math.max(...results.map(r => r.rarity));
-  ov.className = 'overlay show';
+  ov.className = 'overlay show' + (SAVE.settings.flashes === false || SAVE.settings.gfx === 'low' ? ' visual-calm' : '');
   if (await pullTicket(ov, results, bid, n) === 'go') {
     // The star starts blue and "upgrades" to purple / gold to tease the best result.
     ov.innerHTML = `<div class="pull-scene tease"><div class="sky"></div><div class="portal"></div><div class="meteor"></div><div class="flash"></div>
+      <div class="pull-signal"><span>CONNECTING TO THE STAGE</span><div>${'<i></i>'.repeat(7)}</div><b>INCOMING SIGNAL</b></div>
       <div class="tease-stars"></div><div class="skip">Tap to skip</div></div>`;
     const scene = ov.querySelector('.pull-scene');
     const upgrade = (tier, at) => setTimeout(() => {
@@ -782,6 +784,7 @@ async function playPull(results, bid, n, onClose = null) {
       scene.classList.remove('t3', 't4', 't5', 'bump'); void scene.offsetWidth;
       scene.classList.add(`t${tier}`, 'bump');
       scene.querySelector('.tease-stars').textContent = '★'.repeat(tier);
+      scene.querySelector('.pull-signal b').textContent = tier === 5 ? 'GOLD SIGNAL / ★5' : tier === 4 ? 'VIOLET SIGNAL / ★4' : 'BLUE SIGNAL / ★3';
       sfx(`pull${tier}`);
     }, at);
     upgrade(3, 350);
