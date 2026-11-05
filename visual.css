@@ -82,6 +82,10 @@
   .tm-actions { flex-wrap: wrap; }
 }
 @media (max-height: 520px) {
+  .tc.collab .tc-emblem { display: none; }
+  .tc-collab-faces { top: 16%; gap: 3px; padding: 0 10px; flex-wrap: nowrap; }
+  .tc-collab-faces .face { width: 28%; }
+  .tc.collab .tc-role { font-size: 9px; line-height: 1.5; letter-spacing: .5px; }
   .pull-signal { top: 6%; }
   .pull-signal > div { height: 32px; margin: 8px 0; }
   .story-box { min-height: 100px; padding: 22px 24px 18px; }
