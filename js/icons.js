@@ -186,5 +186,20 @@ const foeSprite = (key, hue, cls = '') => {
 };
 
 // Round portrait of an enemy without art (turn order, stage list).
-const foeChip = (key, hue, cls = 'face') =>
-  `<div class="${cls} foe-chip" style="--h:${hue}"><svg viewBox="10 4 100 100" aria-hidden="true">${FOE_SVG[key] || FOE_SVG.grunt}</svg></div>`;
+const foeChip = (key, hue, cls = 'face') => {
+  if (!['grunt', 'sniper', 'spammer', 'firewall', 'desync', 'troll', 'clipper'].includes(key)) return `<div class="${cls} foe-chip" style="--h:${hue}"><svg viewBox="10 4 100 100" aria-hidden="true">${FOE_SVG[key] || FOE_SVG.grunt}</svg></div>`;
+  const sign = key === 'sniper' ? '<path d="M95 29v80M85 30h20M95 20v20"/>'
+    : key === 'firewall' ? '<path d="m75 67 25 8v20l-13 15-12-15z"/>'
+    : key === 'troll' ? '<path d="m33 29-9-17 21 12M76 24l21-12-9 17"/>'
+    : key === 'clipper' ? '<path d="m82 83 20-22-6 33 10 17-22-19"/>'
+    : key === 'desync' ? '<path d="m17 61 6-12 7 13-7 12zM93 39l8-14 7 15-7 13z"/>'
+    : key === 'spammer' ? '<path d="m12 69 15-8 10 17-15 8zM88 42l15 8-8 16-16-8z"/>' : '';
+  return `<div class="${cls} foe-chip shade-chip" style="--h:${hue}"><svg viewBox="0 0 120 120" aria-hidden="true">
+    <path fill="#435862" d="M60 12C40 13 31 30 32 53l-13 52 28-8 13 12 13-12 28 8-13-52C89 30 80 13 60 12z"/>
+    <path fill="#647c83" d="M60 17C45 21 38 36 39 52L29 97l23-13 8 19 8-19 23 13-10-45C82 36 75 21 60 17z"/>
+    <path fill="#253a45" d="m60 27-16 17 3 25 13 10 13-10 3-25z"/>
+    <path d="m48 50 24-3" stroke="#c5d9d3" stroke-width="3" stroke-linecap="round"/>
+    <path d="m50 82-8 18M70 82l8 18" stroke="#8ba2a3" stroke-width="1" fill="none"/>
+    <g stroke="#9eb9b1" stroke-width="2.5" fill="#405761" stroke-linejoin="round">${sign}</g>
+  </svg></div>`;
+};

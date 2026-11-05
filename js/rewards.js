@@ -57,6 +57,8 @@ function openRewards(items, { title = 'Rewards Obtained', sub = '' } = {}) {
       <div class="rw-items n${Math.min(items.length, 6)}">${items.map(rewardCard).join('')}</div>
       <button class="rw-tap" type="button">Reveal all</button>`;
     $('#app').appendChild(el);
+    const priorFocus = document.activeElement;
+    el.querySelector('.rw-tap').focus({ preventScroll: true });
     sfx('reward');
     const cards = [...el.querySelectorAll('.rw-card')];
     let shown = 0;
@@ -78,7 +80,7 @@ function openRewards(items, { title = 'Rewards Obtained', sub = '' } = {}) {
       if (shown < cards.length) { cards.forEach(reveal); return; }
       if (el.classList.contains('out')) return;
       el.classList.add('out');
-      setTimeout(() => { el.remove(); resolve(); }, 280);
+      setTimeout(() => { el.remove(); if (priorFocus?.isConnected) priorFocus.focus({ preventScroll: true }); resolve(); }, 280);
     });
   });
 }

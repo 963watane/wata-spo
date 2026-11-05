@@ -10,7 +10,7 @@ const newChar = () => ({ lvl: 1, bond: 0, tokens: 0, skills: { basic: 1, skill: 
 const TEAM_PRESETS = 5;
 const TEAM_SIZE = 3;      // leader + 2 supports (action battles)
 const defaultTeams = first => Array.from({ length: TEAM_PRESETS }, (_, i) =>
-  ({ name: i === 0 ? 'Main Team' : `Team ${i + 1}`, members: i === 0 ? first.slice(0, TEAM_SIZE) : Array(TEAM_SIZE).fill(null) }));
+  ({ name: i === 0 ? 'Main Team' : `Team ${i + 1}`, plan: 'balanced', members: i === 0 ? first.slice(0, TEAM_SIZE) : Array(TEAM_SIZE).fill(null) }));
 function syncTeam() { SAVE.team = SAVE.teams[SAVE.teamIdx].members.slice(); }
 
 function newSave() {
@@ -32,7 +32,7 @@ function newSave() {
     claimed: {},   // missions already claimed
     stats: Object.assign({}, STAT_KEYS),
     lobby: 'sendo',
-    lobbyScene: 'video:lobby',      // home backdrop: scene id, 'video:<id>', or null = member cut-out
+    lobbyScene: null,      // home backdrop: scene id, 'video:<id>', or null = member cut-out
     videoLobbyDefault: true,
     player: { name: 'Producer', rank: 1, xp: 0 },
     login: { last: null, day: 0 },  // last claim date (YYYY-MM-DD) and days claimed
@@ -97,8 +97,8 @@ function loadSave() {
       s.settings = Object.assign(newSave().settings, s.settings);
       s.daily = Object.assign({ date: null, progress: {}, claimed: {}, shop: {} }, s.daily);
       s.tower = Object.assign({ best: 0 }, s.tower);
-      // The lobby video became the default home screen once; after that it's the player's choice.
-      if (!JSON.parse(raw).videoLobbyDefault) { s.lobbyScene = 'video:lobby'; s.videoLobbyDefault = true; }
+      // Preserve the player's selected artwork, including saves from before the video default.
+      if (!JSON.parse(raw).videoLobbyDefault) { s.videoLobbyDefault = true; }
       // Older saves: add skill ranks / tokens, and cap duplicates at the new max.
       Object.keys(s.chars).forEach(id => {
         const c = Object.assign(newChar(), s.chars[id]);
@@ -113,6 +113,7 @@ function loadSave() {
       }
       // Squads became 3 members (leader + 2 supports): keep the first three, in order.
       s.teams.forEach(t => { if (t.members.length !== TEAM_SIZE) { const m = t.members.filter(Boolean).slice(0, TEAM_SIZE); while (m.length < TEAM_SIZE) m.push(null); t.members = m; } });
+      s.teams.forEach(t => { if (!Object.prototype.hasOwnProperty.call(SpoDesign.plans, t.plan)) t.plan = 'balanced'; });
       s.team = s.teams[s.teamIdx].members.slice();
       SAVE_BROKEN = false;
       return s;
@@ -191,9 +192,10 @@ function skillPower(id, key) {
 }
 
 // Final stats of an owned character, including level, duplicates and Memory bonuses.
-function charStats(id) {
+function charStats(id, previewLevel = null) {
   const c = CHARACTERS[id], own = SAVE.chars[id] || newChar();
-  const lvlMult = 1 + 0.06 * (own.lvl - 1);
+  const lvl = previewLevel == null ? own.lvl : Math.max(1, Math.min(MAX_LEVEL, Math.floor(previewLevel)));
+  const lvlMult = 1 + 0.06 * (lvl - 1);
   const dm = dupeMods(id);
   const mid = SAVE.equip[id], mem = mid && MEMORIES[mid];
   const ms = mem ? mem.stats : {}, mk = mem ? memStatMult(mid) : 0;
@@ -208,6 +210,6 @@ function charStats(id) {
     crit: c.base.crit + (ms.crit || 0) * mk + (dm.crit || 0),
     critDmg: c.base.critDmg + (ms.critDmg || 0) * mk + (dm.critDmg || 0),
     energy: dm.energy || 0,
-    lvl: own.lvl, bond: own.bond, memory: mid || null,
+    lvl, bond: own.bond, memory: mid || null,
   };
 }

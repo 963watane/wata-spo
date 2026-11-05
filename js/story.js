@@ -29,6 +29,7 @@ const STORY_PREFS = { auto: false };
 // Plays a list of story lines over an optional backdrop scene.
 // Resolves when finished or skipped.
 function playStory(lines, title = '', sceneId = null) {
+  if ((title.startsWith('Prologue') || title.startsWith('1-1')) && sceneId === 'street-day') sceneId = 'alley';
   const prevMusic = typeof musicWanted !== 'undefined' ? musicWanted : null;
   if (typeof playMusic === 'function') playMusic('story');
   return new Promise(resolve => {
@@ -38,11 +39,11 @@ function playStory(lines, title = '', sceneId = null) {
     const [kicker, heading] = title.includes(' · ') ? title.split(' · ') : ['', title];
     const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
     ov.innerHTML = `<div class="story intro${calm || SAVE.settings.flashes === false ? ' visual-calm' : ''}">
-      <div class="story-bg ${sceneId ? 'has-scene' : ''}">${sceneId ? `<div class="story-scene ${BACKGROUNDS[sceneId] ? 'env' : ''}" style="${sceneStyle(sceneId)}"></div>` : ''}</div>
+      <div class="story-bg ${sceneId ? 'has-scene' : ''}">${sceneId ? `<div class="story-scene ${BACKGROUNDS[sceneId] ? 'env' : ''}" style="${SpoEnvironment.storyStyle(sceneId)}"></div>` : ''}</div>
       <div class="story-cam"><div class="story-slot left"></div><div class="story-slot right"></div></div>
       <div class="story-vignette"></div>
       <div class="story-bars"><i></i><i></i></div>
-      ${creditHtml(sceneId) ? `<span class="story-credit">${creditHtml(sceneId)}</span>` : ''}
+      ${['street-day', 'city-day', 'sunset-street', 'alley', 'rooftop', 'tunnel'].includes(sceneId) ? '<span class="story-credit">Environment art · WATA SPO</span>' : creditHtml(sceneId) ? `<span class="story-credit">${creditHtml(sceneId)}</span>` : ''}
       <div class="story-title"><em>${kicker}</em>${heading}</div>
       <div class="story-progress"><span></span><i></i></div>
       <div class="story-ctrl">

@@ -12,7 +12,7 @@ const logoHtml = () => `<span class="lg-w">WATA</span><span class="lg-star">${ic
 
 let shownScreen = 'loading';
 function show(id) {
-  // Switching screens plays a stripe wipe; re-rendering the same screen doesn't.
+  // Navigation fades; entering battle keeps a separate cinematic transition.
   if (shownScreen !== id && shownScreen !== 'loading') wipe(id === 'battle');
   shownScreen = id;
   if (typeof playMusic === 'function') playMusic(SCREEN_MUSIC[id] || 'home');
@@ -22,11 +22,12 @@ function show(id) {
 
 function wipe(big) {
   const w = document.createElement('div');
-  w.className = 'wipe' + (big ? ' big' : '');
-  w.innerHTML = '<i></i><i></i><i></i><b>' + logoHtml() + '</b>';
+  const calm = SAVE.settings.flashes === false || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  w.className = 'studio-wipe' + (big && !calm ? ' studio-battle-wipe' : calm ? ' calm' : '');
+  w.innerHTML = big && !calm ? '<div class="studio-transition"><small>NEXT ENCOUNTER</small><b>' + logoHtml() + '</b></div>' : '';
   $('#app').appendChild(w);
   sfx('whoosh');
-  setTimeout(() => w.remove(), big ? 1100 : 700);
+  setTimeout(() => w.remove(), big && !calm ? 1100 : calm ? 80 : 240);
 }
 
 function toast(msg) {
@@ -138,87 +139,48 @@ RENDER.lobby = () => {
     newTalks() && `${newTalks()} new off-stream talk${newTalks() > 1 ? 's' : ''} unlocked`,
   ].filter(Boolean);
   $('#lobby').innerHTML = `
-    <div class="home ${sid || video ? 'scene-mode' : ''} ${video ? 'video-mode' : ''}" style="--c:${c.color}">
-      <div class="home-bg">
-        ${video ? `<video class="home-video" src="${video.src}" autoplay muted loop playsinline></video>`
-          : sid ? `<div class="home-scene" style="${sceneStyle(sid)}"></div>`
-              : `<div class="lobby-bg"></div><div class="lobby-art"><img src="${ART[id].url}" alt="${c.name}"></div>`}
-      </div>
-      <div class="home-shade"></div>
-      <div class="lobby-particles">${Array.from({ length: 16 }, (_, i) =>
-        `<i style="left:${(i * 37) % 100}%;animation-delay:${-(i * 0.9) % 12}s;animation-duration:${9 + (i % 5) * 2}s"></i>`).join('')}</div>
-      <div class="lobby-hearts"></div>
-
-      <div class="home-top">
-        <div class="home-profile">
-          <button class="face home-avatar" style="${faceStyle(profileData().avatar)}" title="Profile"></button>
-          <div class="home-prof-main">
-            <input class="home-name" maxlength="14" value="${p.name.replace(/"/g, '&quot;')}" title="Tap to rename">
-            <div class="home-rank"><b>RANK ${p.rank}</b><div class="home-xp"><i style="width:${p.xp / need * 100}%"></i></div><small>${p.xp}/${need}</small></div>
-          </div>
-        </div>
+    <div class="home studio-home ${sid || video ? 'scene-mode' : ''} ${video ? 'video-mode' : ''}" style="--c:${c.color}">
+      <header class="studio-top">
+        <div class="home-profile"><button class="face home-avatar" style="${faceStyle(profileData().avatar)}" title="Profile"></button><div class="home-prof-main"><input class="home-name" maxlength="14" value="${p.name.replace(/"/g, '&quot;')}" title="Tap to rename"><div class="home-rank"><b>RANK ${p.rank}</b><div class="home-xp"><i style="width:${p.xp / need * 100}%"></i></div><small>${p.xp}/${need}</small></div></div></div>
+        <span class="studio-date">YOUR NEXT GOOD STORY</span>${curHtml()}
+      </header>
+      <nav class="studio-rail" aria-label="Main navigation">
         <div class="home-logo">${logoHtml()}</div>
-        ${curHtml()}
-      </div>
-      <div class="home-ticker"><span class="ht-tag">${ic('tower')}NEWS</span>
-        <div class="ht-track"><div class="ht-run">${[...news, ...news].map(n => `<span>${n}</span>`).join('')}</div></div></div>
-
-      <div class="bubble home-bubble"><b style="color:${c.color}">${c.short}</b>${voice(id, 'lobby')}</div>
-
-      <div class="home-menu">
-        <div class="home-greet">${greeting}, <b>${p.name}</b></div>
-        <button class="home-continue">
-          <span class="hc-play">${ic('play')}</span><span><em>CONTINUE STORY</em><b>${nextStage.id} · ${nextStage.name}</b></span>
-          <small>${SAVE.cleared[nextStage.id] ? 'Replay' : `Rec. Lv ${recLevel(nextStage.level)}`}</small>
-        </button>
-        <button class="tile tile-battle" data-go="stages">
-          <div class="tile-scene" style="${sceneStyle(ch.scene)}"></div>
-          <span class="tile-jp">出撃</span>
-          <span class="tile-ico">${ic('battle')}</span><b>BATTLE</b><small>Chapter ${ch.id} · ${ch.name}</small>
-        </button>
-        <button class="tile tile-recruit" data-go="recruit">
-          <div class="tile-scene" style="${bannerArtStyle(bannerIds[homeSlide % bannerIds.length])}"></div>
-          <span class="tile-jp">スカウト</span>
-          <span class="tile-ico">${ic('recruit')}</span><b>RECRUIT</b><small>${bannerIds.length} banners live${daily().freePull ? '' : ' · <em class="free">FREE PULL</em>'}</small>
-        </button>
-        <button class="tile tile-tower" data-go="tower">
-          <div class="tile-scene" style="${sceneStyle(towerBg(Math.min(TOWER_FLOORS, SAVE.tower.best + 1)))}"></div>
-          <span class="tile-jp">タワー</span>
-          <span class="tile-ico">${ic('tower')}</span><b>TOWER</b><small>Floor ${SAVE.tower.best}/${TOWER_FLOORS}${towerNext ? ` · Boss at ${towerNext}F` : ' · Cleared!'}</small>
-        </button>
-        <div class="home-live">
-          <button class="hl-btn hl-event" data-live="event" style="--c:${evNow.ev.color}"><div class="tile-scene" style="${sceneStyle(evNow.ev.scene)}"></div>
-            <em>EVENT</em><b>${evNow.ev.name}</b><small>${timeLeft(evNow.ends)}</small>${badge(eventMilesReady())}</button>
-          <button class="hl-btn" data-live="raid"><em>${ic('raid')} RAID</em><b>${raidState().best ? raidState().best.toLocaleString() : 'New week'}</b><small>Weekly boss</small></button>
-          <button class="hl-btn hl-run" data-go="rift"><em>${ic('map')} RUN</em><b>${SAVE.run ? `Round ${SAVE.run.node + 1}/${SAVE.run.path.length}` : 'Bracket Run'}</b><small>${SAVE.run ? 'Run in progress' : 'Roguelite · Boosts'}</small>${badge(SAVE.run ? '!' : 0)}</button>
-          <button class="hl-btn" data-live="daily"><em>${ic('live')} DAILY</em><b>${dailyRunsLeft()}/${DAILY_RUNS} runs</b><small>${scheduleToday().name}</small>${badge(dailyRunsLeft() === DAILY_RUNS ? '!' : 0)}</button>
-        </div>
-      </div>
-
-      <nav class="home-dock">${tiles.map(t => `
-        <button class="dock-btn" ${t.go ? `data-go="${t.go}"` : `data-act="${t.act}"`} title="${t.label} · ${t.sub}">
-          ${ic(t.ico)}<b>${t.label}</b><small>${t.jp}</small>${badge(t.badge)}</button>`).join('')}
+        <button class="rail-home selected" data-go="lobby">${ic('live')}<span>Home</span></button>
+        <button data-go="stages">${ic('story')}<span>Journey</span></button>
+        <button class="studio-squad">${ic('team')}<span>Squad</span></button>
+        <button data-go="members">${ic('members')}<span>Members</span></button>
+        <button data-go="recruit">${ic('recruit')}<span>Recruit</span>${daily().freePull ? '' : '<i class="rail-dot"></i>'}</button>
+        <div class="rail-space"></div>
+        <button data-go="missions">${ic('missions')}<span>Missions</span>${badge(missionBadge())}</button>
+        <button data-act="menu">${ic('menu')}<span>More</span></button>
       </nav>
-
-      <div class="home-carousel">
-        <div class="hc-track">${bannerIds.map((bid, i) => {
-          const b = BANNERS[bid], info = bannerInfo(bid);
-          return `<button class="hc-card ${i === homeSlide % bannerIds.length ? 'on' : ''}" data-b="${bid}" style="--c:${info.color}">
-            <div class="hc-art" style="${bannerArtStyle(bid)}"></div>
-            <div class="hc-text"><em>${info.label}</em><b>${b.name}</b><span>${info.upName}</span></div></button>`;
-        }).join('')}</div>
-        <div class="hc-dots">${bannerIds.map((_, i) => `<i class="${i === homeSlide % bannerIds.length ? 'on' : ''}"></i>`).join('')}</div>
+      <main class="studio-canvas">
+        <div class="studio-art-caption"><span>OFF THE CLOCK / ${String(Object.keys(CHARACTERS).indexOf(id) + 1).padStart(2, '0')}</span><b>${c.name}</b></div>
+        <div class="home-bg">
+          ${video ? `<video class="home-video" src="${video.src}" autoplay muted loop playsinline></video>` : sid ? `<div class="home-scene" style="${sceneStyle(sid)}"></div>` : `<div class="lobby-art"><img src="${ART[id].url}" alt="${c.name}"></div>`}
+        </div>
+        <div class="lobby-hearts"></div>
+        <div class="bubble home-bubble"><b>${c.short}</b>${voice(id, 'lobby')}</div>
+        <div class="home-switch"><button class="sw prev" aria-label="Previous artwork" ${views.length < 2 ? 'disabled' : ''}>${ic('back')}</button><span><b>${video ? video.title : sid ? SCENES[sid].title : c.short}</b><small>${video ? 'Animated scene' : sid ? 'Illustrated scene' : 'Character portrait'}</small></span><button class="sw next" aria-label="Next artwork" ${views.length < 2 ? 'disabled' : ''}>${ic('next')}</button></div>
+      </main>
+      <aside class="studio-journey">
+        <div class="studio-eyebrow">CHAPTER ${String(ch.id).padStart(2, '0')} <span>${STAGES.filter(s => s.chapter === ch.id && SAVE.cleared[s.id]).length} / ${STAGES.filter(s => s.chapter === ch.id).length} CLEARED</span></div>
+        <h1>${ch.name}</h1><p class="studio-intro">A story worth coming back to.<br>${SAVE.team.filter(Boolean).length < 3 ? 'Add your new member in Squad before you set out.' : teamAvgLv() < recLevel(nextStage.level) ? 'Train your squad for the encounter ahead.' : 'Your squad is ready for the next encounter.'}</p>
+        <div class="studio-next"><span>NEXT UP <b>${nextStage.id}</b></span><h2>${nextStage.name}</h2><small>${nextStage.boss ? 'Boss encounter' : 'Story encounter'} · Recommended Lv ${recLevel(nextStage.level)}</small></div>
+        <button class="home-continue studio-primary"><span>${SAVE.cleared[nextStage.id] ? 'Play again' : 'Continue journey'}</span>${ic('next')}</button>
+        <button class="studio-route" data-go="stages">View chapter route <span>→</span></button>
+        <div class="studio-squad-summary"><div>${SAVE.team.filter(Boolean).map(mid => `<i class="face" style="${faceStyle(mid)}" title="${CHARACTERS[mid].short}"></i>`).join('')}</div><span>${SAVE.team.filter(Boolean).length}/3 members <small>Avg. Lv ${teamAvgLv()}</small></span><button class="studio-train" aria-label="Train squad">${ic('plus')}</button></div>
+        <div class="studio-live"><button data-live="event"><i></i><span>LIMITED EVENT<b>${evNow.ev.name}</b></span>${ic('next')}</button><button data-live="daily">${ic('live')}<span>DAILY STREAM<b>${dailyRunsLeft()} runs available</b></span>${ic('next')}</button></div>
+      </aside>
+      <div class="studio-bottom">
+        <button class="home-ticker"><span class="ht-tag">${ic('news')} NOTICE</span><span>${news[0]}</span>${ic('next')}</button>
+        <div class="studio-tools"><button data-act="login">${ic('login')}<span>${loginReady() ? 'Claim login gift' : 'Login rewards'}</span>${badge(loginReady() ? '!' : 0)}</button><button data-go="talks">${ic('talks')}<span>Off-stream talks</span>${badge(newTalks())}</button></div>
       </div>
-
-      <div class="home-switch">
-        <button class="sw prev" ${views.length < 2 ? 'disabled' : ''}>${ic('back')}</button>
-        <span><b>${video ? video.title : c.short}</b><small>${video ? 'Video' : sid ? SCENES[sid].title : 'Character'}</small></span>
-        <button class="sw next" ${views.length < 2 ? 'disabled' : ''}>${ic('next')}</button>
-      </div>
-
-      <div class="lobby-foot">${sid ? creditHtml(sid) : ''} Fan-made and non-commercial. Characters belong to VSPO! / Brave group; art belongs to its artists.
-        <button class="link reset">Reset save</button></div>
-    </div>`;
+      <div class="home-carousel studio-featured"><div class="hc-track">${bannerIds.map((bid, i) => { const b = BANNERS[bid], info = bannerInfo(bid); return `<button class="hc-card ${i === homeSlide % bannerIds.length ? 'on' : ''}" data-b="${bid}" style="--c:${info.color}"><div class="hc-art" style="${bannerArtStyle(bid)}"></div><div class="hc-text"><em>ON AIR / ${info.label}</em><b>${b.name}</b><span>${info.upName}</span></div>${ic('next')}</button>`; }).join('')}</div><div class="hc-dots">${bannerIds.map((_, i) => `<i class="${i === homeSlide % bannerIds.length ? 'on' : ''}"></i>`).join('')}</div></div>
+      <div class="lobby-foot">${sid ? creditHtml(sid) : ''}<span>Unofficial VSPO! fan game · Art belongs to its artists.</span><button class="link reset">Reset save</button></div>
+    </div>
+`;
 
   // If the video file isn't available (e.g. the online copy), fall back to the member cut-out.
   const vidEl = $('#lobby .home-video');
@@ -237,7 +199,8 @@ RENDER.lobby = () => {
     say(voice(id, Math.random() < 0.5 ? 'tap' : 'lobby'));
     const h = document.createElement('i');
     h.innerHTML = ic('heart');
-    h.style.left = e.clientX + 'px'; h.style.top = e.clientY + 'px'; h.style.color = c.color;
+    const rect = $('#lobby .studio-canvas').getBoundingClientRect();
+    h.style.left = (e.clientX - rect.left) + 'px'; h.style.top = (e.clientY - rect.top) + 'px'; h.style.color = c.color;
     $('#lobby .lobby-hearts').appendChild(h);
     setTimeout(() => h.remove(), 1000);
   };
@@ -254,6 +217,8 @@ RENDER.lobby = () => {
   $('#lobby [data-act="login"]').onclick = () => openLogin();
   $('#lobby [data-act="menu"]').onclick = () => openMenu();
   $('#lobby .home-avatar').onclick = () => show('profile');
+  $('#lobby .studio-squad').onclick = () => openTeam();
+  $('#lobby .studio-train').onclick = () => SpoDesign.openTraining(SAVE.team, null, () => RENDER.lobby());
   $('#lobby .home-ticker').onclick = () => show('news');
   $('#lobby .home-continue').onclick = () => startStage(nextStage);
   document.querySelectorAll('#lobby [data-live]').forEach(b => b.onclick = () => { liveTab = b.dataset.live; show('live'); });
@@ -666,9 +631,18 @@ function openBannerDetail(bid) {
 
 function waitClick(el, ms) {
   return new Promise(r => {
-    const done = () => { clearTimeout(t); el.removeEventListener('click', done); r(); };
+    const prior = document.activeElement, tabindex = el.getAttribute('tabindex');
+    const key = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); done(); } };
+    const done = () => {
+      clearTimeout(t); el.removeEventListener('click', done); el.removeEventListener('keydown', key);
+      if (tabindex === null) el.removeAttribute('tabindex'); else el.setAttribute('tabindex', tabindex);
+      if (prior?.isConnected) prior.focus({ preventScroll: true });
+      r();
+    };
     const t = ms ? setTimeout(done, ms) : null;
+    el.tabIndex = 0; el.focus({ preventScroll: true });
     el.addEventListener('click', done);
+    el.addEventListener('keydown', key);
   });
 }
 
@@ -802,7 +776,7 @@ async function playPull(results, bid, n, onClose = null) {
       results.filter(r => r.type === 'item').length && `<span>Superchat ×${results.filter(r => r.type === 'item').length}</span>`,
     ].filter(Boolean).join('')}</div>
     <div class="rcards n${results.length}">${results.map((res, i) => `
-      <div class="rcard r${res.rarity}" data-i="${i}" style="animation-delay:${i * 70}ms">
+      <div class="rcard r${res.rarity}" role="button" tabindex="0" aria-label="Reveal recruit ${i + 1}" data-i="${i}" style="animation-delay:${i * 70}ms">
         <div class="rcard-inner">
           <div class="rcard-back"><span>${ic('spark')}</span><em>WATA☆SPO</em></div>
           <div class="rcard-front">${resultFront(res)}</div>
@@ -823,6 +797,7 @@ async function playPull(results, bid, n, onClose = null) {
     const el = cards[i], res = results[i];
     if (el.classList.contains('open')) return;
     el.classList.add('open');
+    el.setAttribute('aria-label', el.querySelector('.rcard-name').textContent);
     sfx(res.rarity === 5 ? 'pull5' : res.rarity === 4 ? 'pull4' : 'flip');
     if (res.type !== 'item' && (res.rarity === 5 || res.isNew)) {
       await new Promise(r => setTimeout(r, 350));
@@ -846,6 +821,7 @@ async function playPull(results, bid, n, onClose = null) {
     const res = results[i];
     toast(res.type === 'char' ? `${CHARACTERS[res.id].short}: "${voice(res.id, 'tap')}"` : el.querySelector('.rcard-name').textContent);
   });
+  cards.forEach(el => el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
   ov.querySelector('.reveal').onclick = async () => {
     if (busy) return;
     busy = true;
@@ -859,7 +835,7 @@ async function playPull(results, bid, n, onClose = null) {
   if (skip) skip.onclick = async () => {
     if (busy) return;
     busy = true;
-    cards.forEach((el, i) => el.classList.add('open'));
+    cards.forEach(el => { el.classList.add('open'); el.setAttribute('aria-label', el.querySelector('.rcard-name').textContent); });
     sfx(results.some(r => r.rarity === 5) ? 'pull5' : 'flip');
     for (const res of results) {
       if (res.type !== 'item' && (res.rarity === 5 || (res.isNew && res.type === 'char'))) await showSplash(ov, res);
@@ -1349,6 +1325,7 @@ RENDER.team = () => {
           <small class="tm-hits">${filled.filter(id => stageWeak(st).includes(CHARACTERS[id].element)).length}/${filled.length} members hit a weakness</small></div>
       </div>` : ''}
       <div class="tm-cards">${teamCards(members, editing)}</div>
+      ${!editing ? `<div class="studio-prep"><button class="studio-training-open">${ic('plus')} Train squad</button><button class="studio-plan-open">${ic('team')} ${SpoDesign.plan(st && !SpoDesign.allowedFor(st) ? 'balanced' : preset.plan).name} plan</button></div>` : ''}
       ${editing ? `
       <div class="tm-checkbar">
         <div class="tm-roles">${roleCheck(members)}</div>
@@ -1415,6 +1392,8 @@ RENDER.team = () => {
     RENDER.team();
   };
   $('#team .edit').onclick = () => startEdit();
+  $('#team .studio-training-open').onclick = () => SpoDesign.openTraining(members, st ? recLevel(st.level) : null, () => RENDER.team());
+  $('#team .studio-plan-open').onclick = () => SpoDesign.openPlans(teamView, st, () => RENDER.team());
   const rec = $('#team .recommend');
   if (rec) rec.onclick = () => {
     startEdit();
@@ -1540,11 +1519,13 @@ function stagePanel(st, i) {
     <h3>${st.name}</h3>
     <div class="sp-meta"><span>Enemy Lv ${st.level}</span><span class="${teamLv < rec ? 'warn' : 'ok'}">Rec. Lv ${rec} · your team ${teamLv}</span>
       <span>${st.waves.length} wave${st.waves.length > 1 ? 's' : ''}</span></div>
+    <div class="studio-readiness"><small>SQUAD READINESS</small>${SpoDesign.readiness(st, SAVE.team).map(r => `<div class="${r.ok ? 'ready' : ''}"><b>${r.ok ? '✓' : '○'}</b>${r.text}</div>`).join('')}<button class="sp-train">Review squad training →</button></div>
     <div class="sp-sec">Enemies</div>
     <div class="sp-foes">${foes.map(k => `<div class="sp-foe ${ENEMIES[k].boss ? 'boss' : ''}" title="${ENEMIES[k].desc}">${enemyFace(k)}<div><b>${ENEMIES[k].name}</b><span>${weakIcons(k)}</span></div></div>`).join('')}</div>
     <div class="sp-sec">Weak to</div>
     <div class="sp-weak">${weak.map(w => `<span>${elIc(w)}${ELEMENTS[w].name}</span>`).join('')}</div>
     ${good.length ? `<div class="sp-good"><small>Good picks</small>${good.map(id => `<span class="face" style="${faceStyle(id)}" title="${CHARACTERS[id].short}"></span>`).join('')}</div>` : ''}
+    ${Object.values(SpoDesign.plans).filter(p => p.unlock === st.id).map(p => `<div class="studio-unlock"><small>${cleared ? 'TACTIC UNLOCKED' : 'STORY MILESTONE'}</small><b>${p.name}</b><span>${p.desc}</span></div>`).join('')}
     <div class="sp-sec">Objectives</div>
     <div class="sp-obj">${stageObjectives(st).map((t, k) => `<div class="${stars[k] ? 'on' : ''}">${ic('star')}<span>${t}</span></div>`).join('')}</div>
     <div class="sp-sec">${cleared ? 'Replay rewards' : 'First clear'}</div>
@@ -1575,12 +1556,12 @@ RENDER.stages = () => {
   $('#stages').innerHTML = `
     ${topbar('Story', 'lobby', 'elements')}
     <div class="smap">
-      <div class="smap-bg" style="${sceneStyle(ch.scene)}"></div>
+      <div class="smap-bg" style="background-image:url('assets/environment/${ch.id === 1 ? 'seaside-promenade' : 'evening-lane'}.jpg')"></div>
       <div class="smap-head">
         <div class="ch-tabs">${CHAPTERS.map(c => `<button class="ch-tab ${c.id === ch.id ? 'sel' : ''}" data-ch="${c.id}" ${chapterUnlocked(c) ? '' : 'disabled'}>
           Chapter ${c.id}<small>${chapterUnlocked(c) ? c.name : 'Locked'}</small></button>`).join('')}</div>
         <div class="smap-title"><em>CHAPTER ${ch.id}</em><h2>${ch.name}</h2><p>${ch.desc}</p>
-          <span class="smap-stars">${ic('star')} ${got}/${list.length * 3}</span></div>
+          <span class="smap-stars">${ic('star')} ${got}/${list.length * 3}<small>${list.filter(o => SAVE.cleared[o.st.id]).length} of ${list.length} encounters cleared</small></span></div>
       </div>
       <div class="smap-area">
         <svg class="smap-path" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -1593,7 +1574,7 @@ RENDER.stages = () => {
             <span class="snode-core">${bossId ? enemyFace(bossId) : `<b>${o.st.id.split('-')[1]}</b>`}${locked ? `<i class="snode-lock">${ic('lock')}</i>` : ''}</span>
             ${next && o.st.id === next.st.id ? '<span class="snode-flag">NEXT</span>' : ''}
             <span class="snode-stars">${[0, 1, 2].map(s => `<i class="${stars[s] ? 'on' : ''}">${ic('star')}</i>`).join('')}</span>
-            <span class="snode-name">${o.st.name}</span>
+            <span class="snode-name"><small>${o.st.boss ? 'BOSS' : 'ENCOUNTER'} ${o.st.id}</small><b>${o.st.name}</b><em>${locked ? 'Complete the previous encounter' : cleared ? 'Replay available' : 'Ready to begin'}</em></span>
           </button>`;
         }).join('')}
       </div>
@@ -1606,6 +1587,7 @@ RENDER.stages = () => {
   document.querySelectorAll('#stages .ch-tab').forEach(b => b.onclick = () => { stagesChapter = Number(b.dataset.ch); stagesSel = null; RENDER.stages(); });
   document.querySelectorAll('#stages .snode').forEach(b => b.onclick = () => { stagesSel = b.dataset.id; sfx('select'); RENDER.stages(); });
   $('#stages .sp-start').onclick = () => startStage(st);
+  $('#stages .sp-train').onclick = () => SpoDesign.openTraining(SAVE.team, recLevel(st.level), () => RENDER.stages());
   // Sweep: 3-star stages can be cleared instantly for their replay rewards.
   const sweep = $('#stages .sp-sweep');
   if (sweep) sweep.onclick = () => {
@@ -1657,6 +1639,7 @@ async function startBattle(stage) {
     return show(stage.tower ? 'tower' : 'stages');
   }
   await loadChibiModels();
+  await SpoEnvironment.load();
   currentBattle = new ActionBattle($('#battle'), stage, team, async (reason, won) => {
     currentBattle = null;
     if (reason === 'retry') return startBattle(stage);
@@ -1684,7 +1667,7 @@ async function startBattle(stage) {
     stagesChapter = currentChapter().id;
     stagesSel = null;
     show('stages');
-  });
+  }, { plan: SAVE.teams[SAVE.teamIdx].plan || 'balanced' });
 }
 
 // ---------- Boot ----------

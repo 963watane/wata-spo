@@ -23,7 +23,7 @@ const HELP = {
       <h4>${ic('skill')} Skill and Support Skills</h4>
       <p><kbd>E</kbd> uses the leader's <b>Skill</b>. <kbd>1</kbd> and <kbd>2</kbd> call a <b>support</b> in for her Support Skill: heals, shields, sniping, paint bombs and more. Each has a cooldown.</p>
       <h4>${ic('ult')} Ultimate</h4>
-      <p>Hitting enemies, taking hits and Perfect Dodges fill Energy. When the ring is full, <kbd>Q</kbd> fires the leader's <b>Ultimate</b>, and you can't be hit while it plays.</p>
+      <p>Hitting enemies, taking hits and Perfect Dodges fill Energy. At 100%, <kbd>Q</kbd> fires the leader's <b>Ultimate</b>, and you can't be hit while it plays.</p>
       <h4>${ic('raid')} Stagger, Weakness and Break</h4>
       <p>The white bar under an enemy's health is its <b>Stagger</b>. Hits from an element it is <b>weak</b> to (icons above it) deal +20% damage and much more Stagger. Empty the bar to <b>Break</b> it: it is stunned, takes 30% more damage, and anything it was winding up is cancelled, including a boss's charged attack.</p>
       <h4>${ic('spark')} Break effects</h4>
@@ -33,6 +33,8 @@ const HELP = {
       <p>Bosses change phase at half HP and again at a quarter, with new attacks. Watch the name under the boss bar: <b>!!</b> means a charged attack. Break the boss to cancel it, or get out of the zone.</p>
       <h4>${ic('star')} Stars</h4>
       <p>Clear the stage, finish with at least half your HP, and beat the time target shown under the clock.</p>
+      <h4>${ic('map')} Connected story areas</h4>
+      <p>After clearing an area, follow the path forward with WASD or the left stick. The Continue button or <kbd>Enter</kbd> starts assisted walking; manual movement takes priority. Auto also walks between areas. Travel and closing dialogue do not count toward the time objective.</p>
       <h4>${ic('auto')} Auto</h4>
       <p><kbd>F</kbd> or the AUTO button lets the leader fight on her own. Auto is decent, but it reacts late and misses some warnings.</p>
       <h4>${ic('info')} Statuses</h4>
@@ -51,6 +53,7 @@ const HELP = {
     title: 'Growth',
     html: () => `
       <h4>${ic('token')} Levels</h4><p>Spend Superchat Tokens to level members up to Lv ${MAX_LEVEL}. Each stage shows a recommended level.</p>
+      <h4>${ic('team')} Squad training and tactics</h4><p>Train squad lets you choose a target level and review the exact token cost and stat gains for all deployed members before confirming. Story milestones unlock squad tactics: Spotlight at 1-2, Safe Harbor at 1-4, and Relay at 2-1. Switch freely in Squad; each has an explicit tradeoff. Ranked, tutorial and Bracket Run battles use Balanced.</p>
       <h4>${ic('skill')} Skills</h4><p>Each skill has ranks 1-${MAX_SKILL_RANK}; every rank adds +${Math.round(SKILL_RANK_BONUS * 100)}% to its effect. Higher levels raise the rank cap.</p>
       <h4>${ic('spark')} Duplicates</h4><p>Pulling a member you own gives a duplicate token. Tokens unlock up to ${MAX_DUPES} bonus nodes per member.</p>
       <h4>${ic('recruit')} Memories</h4><p>Equip one Memory per member for stats and a passive. A Memory's signature member gets +50% from its passive. Duplicates raise its Rank (max ${MAX_MEM_RANK}).</p>

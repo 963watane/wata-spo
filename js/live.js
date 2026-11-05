@@ -277,7 +277,7 @@ function raidView() {
     <div class="rd-boss"><div class="rd-art">${ART[r.boss] ? `<img src="${ART[r.boss].url}" alt="">` : foeSprite(r.boss, boss.hue)}</div>
       <div class="rd-info"><em>WEEKLY BOSS · <span class="rc-timer">${ic('timer')}${timeLeft(r.ends)}</span></em><h2>${boss.name}</h2>
         <div class="rd-weak"><small>WEAK TO</small>${weakIcons(r.boss)}<span>${boss.weak.map(k => ELEMENTS[k].name).join(' · ')}</span></div>
-        <p>Deal as much damage as you can in <b>${RAID_TURNS} member turns</b>. The boss has ×${RAID_HP_MULT} HP. Defeating it adds a 20% bonus. Rewards are paid once per tier, every week.</p>
+        <p>Deal as much damage as you can in <b>${RAID_TIME} seconds</b>. The boss has ×${RAID_HP_MULT_A} HP. Defeating it adds a 20% bonus. Rewards are paid once per tier, every week.</p>
         <div class="rd-mods">${r.mods.map(m => `<div><b>${RAID_MODS[m].name}</b><span>${RAID_MODS[m].desc}</span></div>`).join('')}</div>
         <div class="rd-best"><small>YOUR WEEKLY BEST</small><b>${rs.best.toLocaleString()}</b>${nextTier ? `<span>Next tier at ${nextTier.score.toLocaleString()}</span>` : '<span>All tiers cleared!</span>'}</div>
         <button class="pill yellow rd-go">${ic('raid')} Start Raid</button></div></div>

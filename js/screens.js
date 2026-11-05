@@ -144,7 +144,7 @@ RENDER.settings = () => {
           `<button class="${s.cutins === v ? 'sel' : ''}" data-cut="${v}">${l}</button>`).join('')}</div></div>
         <label class="set-row"><span>Screen shake</span><button class="toggle ${s.shake ? 'on' : ''}" data-set="shake"><i></i></button></label>
         <label class="set-row"><span>Bright flashes</span><button class="toggle ${s.flashes ? 'on' : ''}" data-set="flashes"><i></i></button></label>
-        <p class="set-note">Battle keys: Q Basic · E Skill · R Ultimate · 1-4 a member's Ultimate · C Collab · Esc Pause.</p>
+        <p class="set-note">Battle keys: WASD / arrows Move · Space Dodge · E Skill · Q Ultimate · 1 / 2 Supports · F Auto · Esc Pause. Between story areas, walk forward or press Enter for assisted walking.</p>
       </section>
       <section class="set-card">
         <h3>Save data</h3>
@@ -166,6 +166,7 @@ RENDER.settings = () => {
         <h3>About</h3>
         <p class="set-note">WATA☆SPO is an unofficial, non-commercial fan game. Characters belong to VSPO! / Brave group. Art belongs to its artists.</p>
         ${credits ? `<p class="set-note">Art credits:</p><ul class="set-credits">${credits}</ul>` : ''}
+        <p class="set-note">Original environment illustrations: WATA SPO, generated with OpenAI image generation. Source prompts and asset details are in assets/environment/README.md.</p>
         <p class="set-note">3D model credits:</p><ul class="set-credits">${Object.values(MODEL_CREDITS).map(m =>
           `<li>${m.title} — <a href="${m.url}" target="_blank" rel="noopener">${m.by}</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">${m.license}</a>; ${m.changes}</li>`).join('')}</ul>
       </section>
