@@ -50,12 +50,12 @@ function showRewards(items, opts = {}) {
 function openRewards(items, { title = 'Rewards Obtained', sub = '' } = {}) {
   return new Promise(resolve => {
     const el = document.createElement('div');
-    el.className = 'rw';
+    el.className = 'rw' + (SAVE.settings.flashes === false || SAVE.settings.gfx === 'low' ? ' visual-calm' : '');
     el.innerHTML = `<div class="rw-bg"><i class="rw-rays"></i><i class="rw-glow"></i></div>
       <div class="rw-sparks">${Array.from({ length: 22 }, () => `<i style="--x:${(Math.random() * 100).toFixed(1)}%;--d:${(Math.random() * 4).toFixed(2)}s;--s:${(0.5 + Math.random()).toFixed(2)}"></i>`).join('')}</div>
       <div class="rw-head">${sub ? `<em>${sub}</em>` : ''}<h2>${title}</h2><i class="rw-line"></i></div>
       <div class="rw-items n${Math.min(items.length, 6)}">${items.map(rewardCard).join('')}</div>
-      <div class="rw-tap">Tap anywhere to continue</div>`;
+      <button class="rw-tap" type="button">Reveal all</button>`;
     $('#app').appendChild(el);
     sfx('reward');
     const cards = [...el.querySelectorAll('.rw-card')];
@@ -66,7 +66,10 @@ function openRewards(items, { title = 'Rewards Obtained', sub = '' } = {}) {
       shown++;
       const b = c.querySelector('.rw-n b');
       if (b) countUp(b, Number(c.dataset.n), 650);
-      if (shown === cards.length) setTimeout(() => el.classList.add('ready'), 250);
+      if (shown === cards.length) {
+        el.querySelector('.rw-tap').textContent = 'Continue';
+        setTimeout(() => el.classList.add('ready'), 250);
+      }
     };
     cards.forEach((c, i) => setTimeout(() => { if (el.isConnected && !c.classList.contains('in')) { reveal(c); sfx('rewardItem'); } }, 480 + i * 120));
     el.addEventListener('click', e => {
