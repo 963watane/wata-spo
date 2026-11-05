@@ -848,6 +848,7 @@ class ActionBattle {
 
   buildDom() {
     const st = this.stage, n = st.waves.length;
+    this.root.classList.toggle('hud-quiet', SAVE.settings.flashes === false || SAVE.settings.gfx === 'low');
     const dodgeSvg = '<svg viewBox="0 0 24 24" class="ic"><path d="M4 16c4 0 6-2 9-6M4 11c3 0 5-1.5 7-4M14 5l6 0-1 6M20 5l-7 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     this.root.innerHTML = `
       <canvas class="ab-cv"></canvas>
@@ -863,7 +864,7 @@ class ActionBattle {
       ${st.raid ? '<div class="ab-raid"><small>RAID SCORE</small><b>0</b></div>' : ''}
       <div class="ab-hero">
         <div class="abh-face"></div>
-        <div class="abh-main"><div class="abh-name"></div><div class="abh-hp"><i class="abh-trail"></i><i class="abh-fill"></i><s class="abh-shield"></s></div><div class="abh-num"></div><div class="abh-buffs"></div></div>
+        <div class="abh-main"><div class="abh-name"></div><div class="abh-hp"><i class="abh-trail"></i><i class="abh-fill"></i></div><div class="abh-guard hidden"><span>SHIELD</span><div><s class="abh-shield"></s></div><b></b></div><div class="abh-num"></div><div class="abh-buffs"></div></div>
       </div>
       <div class="ab-combo hidden"><b>0</b><span>HITS</span></div>
       <div class="ab-title"><b></b><span></span></div>
@@ -871,7 +872,7 @@ class ActionBattle {
       <div class="ab-banner"></div>
       <div class="ab-stick hidden"><i></i></div>
       <div class="ab-btns">
-        <button class="ab-b ult" data-k="ult"><span class="abb-ring"></span><span class="abb-face"></span><em>ULT</em><kbd>Q</kbd></button>
+        <button class="ab-b ult" data-k="ult"><span class="abb-ring"></span><span class="abb-face"></span><em>ULTIMATE</em><small class="abb-charge"></small><kbd>Q</kbd></button>
         <button class="ab-b skill" data-k="skill"><span class="abb-cd"></span>${ic('skill')}<em>SKILL</em><kbd>E</kbd><small class="abb-t"></small></button>
         <button class="ab-b dodge" data-k="dodge"><span class="abb-cd"></span>${dodgeSvg}<em>DODGE</em><kbd>SPACE</kbd><span class="abb-pips"></span></button>
         ${this.team.slice(1).map((id, i) => `<button class="ab-b sup" data-k="sup${i}" style="--c:${CHARACTERS[id].color}"><span class="abb-cd"></span><span class="abb-face" style="${faceStyle(id)}"></span><kbd>${i + 1}</kbd><small class="abb-t"></small></button>`).join('')}
@@ -2923,33 +2924,51 @@ class ActionBattle {
       this.q('.abh-fill').style.width = (hp * 100) + '%';
       this.q('.abh-trail').style.width = (hp * 100) + '%';
       this.q('.abh-shield').style.width = Math.min(100, h.shield / h.maxHp * 100) + '%';
-      this.q('.abh-num').textContent = `${Math.max(0, Math.round(h.hp)).toLocaleString()} / ${h.maxHp.toLocaleString()}${h.shield ? `  +${Math.round(h.shield)}` : ''}`;
+      this.q('.abh-num').textContent = `${Math.max(0, Math.round(h.hp)).toLocaleString()} / ${h.maxHp.toLocaleString()} HP`;
+      this.q('.abh-guard').classList.toggle('hidden', h.shield <= 0);
+      this.q('.abh-guard b').textContent = Math.round(h.shield).toLocaleString();
       this.root.classList.toggle('low-hp', hp < 0.3 && h.alive);
     }
     if (force) {
+      this.root.style.setProperty('--member', h.def.color);
+      this.q('.ab-b.skill').setAttribute('aria-label', h.kit.skill.name + ' (E)');
+      this.q('.ab-b.ult').setAttribute('aria-label', h.kit.ult.name + ' (Q)');
+      this.q('.ab-b.dodge').setAttribute('aria-label', 'Dodge (Space)');
       this.q('.abh-face').setAttribute('style', faceStyle(h.id) + `;--c:${h.def.color}`);
       this.q('.abh-name').innerHTML = `<b>${h.def.short}</b><span>Lv ${h.lvl}</span>${elIc(h.def.element)}`;
       this.q('.ab-b.ult .abb-face').setAttribute('style', faceStyle(h.id));
       this.q('.ab-b.ult').style.setProperty('--c', h.def.color);
     }
     // buttons
+    const blocked = this.hasStatus(h, 'silence') || !h.alive;
     const ult = this.q('.ab-b.ult');
     ult.style.setProperty('--e', (h.energy / 100 * 360) + 'deg');
-    ult.classList.toggle('ready', h.energy >= 100);
+    ult.classList.toggle('ready', h.energy >= 100 && !blocked);
+    const energy = Math.min(100, Math.max(0, Math.floor(h.energy)));
+    if (force || this.hudEnergy !== energy || this.hudBlocked !== blocked) {
+      this.hudEnergy = energy; this.hudBlocked = blocked;
+      ult.querySelector('.abb-charge').textContent = blocked ? 'LOCKED' : energy >= 100 ? 'READY' : energy + '%';
+    }
     const sk = this.q('.ab-b.skill'), skMax = h.skillCdMax || h.kit.skill.cd;
     sk.style.setProperty('--cd', (h.skillCd / skMax * 360) + 'deg');
     sk.classList.toggle('cool', h.skillCd > 0);
+    sk.classList.toggle('ready', h.skillCd <= 0 && !blocked);
     sk.querySelector('.abb-t').textContent = h.skillCd > 0 ? Math.ceil(h.skillCd) : '';
     const dg = this.q('.ab-b.dodge');
     dg.classList.toggle('cool', h.dodge <= 0);
     dg.style.setProperty('--cd', (h.dodge <= 0 ? (1 - h.dodgeT / ACT.dodgeRecharge) * 360 : 0) + 'deg');
-    dg.querySelector('.abb-pips').innerHTML = Array.from({ length: h.dodgeMax }, (_, i) => `<i class="${i < h.dodge ? 'on' : ''}"></i>`).join('');
+    // Rebuild charge pips only when a charge changes, not every HUD update.
+    if (force || this.hudDodge !== h.dodge || this.hudDodgeMax !== h.dodgeMax) {
+      this.hudDodge = h.dodge; this.hudDodgeMax = h.dodgeMax;
+      dg.querySelector('.abb-pips').innerHTML = Array.from({ length: h.dodgeMax }, (_, i) => `<i class="${i < h.dodge ? 'on' : ''}"></i>`).join('');
+    }
     this.supports.forEach((s, i) => {
       const b = this.q(`.ab-b[data-k="sup${i}"]`);
       if (!b) return;
       b.style.setProperty('--cd', (s.cd / s.cdMax * 360) + 'deg');
       b.classList.toggle('cool', s.cd > 0);
-      b.classList.toggle('ready', s.cd <= 0);
+      b.classList.toggle('ready', s.cd <= 0 && s.on <= 0 && !blocked);
+      if (force) b.setAttribute('aria-label', s.def.short + ': ' + s.kit.support.name + ' (' + (i + 1) + ')');
       b.querySelector('.abb-t').textContent = s.cd > 0 ? Math.ceil(s.cd) : '';
     });
     this.root.classList.toggle('silenced', this.hasStatus(h, 'silence'));
@@ -3271,3 +3290,4 @@ function simulateBattle(stage, team, opts = {}) {
   while (!b.over && b.time < (opts.maxTime || 400)) b.step(dt);
   return { won: !!b.won, time: Math.round(b.time), hp: Math.round(b.player.hp / b.player.maxHp * 100), dmg: Math.round(b.totalDmg || 0), stats: b.stat };
 }
+
